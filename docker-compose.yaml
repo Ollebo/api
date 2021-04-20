@@ -1,0 +1,39 @@
+version: '2'
+services:
+  api:
+    build: .
+    volumes:
+      - ./:/code
+    command: tail -f /etc/fstab
+    ports:
+      - 8088:8080
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/code/key/mantiser-com-local_dev.json
+      - REDISHOST=redis
+      - REDISPORT=6379
+      - AUTH_TOKENS=['1234','6789']
+      - ELASTICSEARCH=elasticsearch
+      - INDB=influxdb
+      - INDB_PORT=8086
+      - INDB_USER=influxdb
+      - INDB_PASSWORD=influxdb
+      - INDB_DATABASE=ollebo
+    depends_on: 
+      - redis
+  redis:
+    image: redis
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.11.1
+    environment:
+      - cluster.name=docker-cluster
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+      - discovery.type=single-node
+  influxdb:
+    image: influxdb
+    environment:
+      DOCKER_INFLUXDB_INIT_USERNAME: influxdb
+      DOCKER_INFLUXDB_INIT_PASSWORD: influxdb
+      DOCKER_INFLUXDB_INIT_ORG: ollebo
+      DOCKER_INFLUXDB_INIT_BUCKET: fluxdb
