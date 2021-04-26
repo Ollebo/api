@@ -2,6 +2,7 @@ requests
 redis
 requests
 elasticsearch
+influxdb-client
 influxdb
 pika
 flask

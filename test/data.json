@@ -2,15 +2,7 @@
     "type": "sensor",
     "id": "mac ore if from device",
     "client": "sib",
-    "from": "machine2",
-    "timestamp":"2021-04-20T20:04:25+00:00",
-    "data":{
-        "temp":"35",
-        "valu3":"23dd"
-
-
-
-    }
+    "from": "machine2"
 
 
 
