@@ -5,7 +5,10 @@ import json
 
 #client = InfluxDBClient(,os.environ['INDB_PORT'] , os.environ['INDB_USER'], os.environ['INDB_PASSWORD'], os.environ['INDB_DATABASE'])
 from influxdb_client import InfluxDBClient
-client = InfluxDBClient(url="http://influxdb:9999", token="yduilsJKTS576576ASD", org="ollebo")
+in_url =  os.environ.get('INDB', 'influxdb')
+in_token =  os.environ.get('INDB_TOKEN', '1234')
+in_org =  os.environ.get('INDB_ORG', 'ollebo')
+client = InfluxDBClient(url="http://{0}:9999".format(in_url), token=in_token, org=in_org)
 
 
 
@@ -14,15 +17,7 @@ def add_influxdb(data):
     #Adding data to influx
     write_api = client.write_api()
     #print(data)
-    dataToWrite = {"measurement": 
-        "h2o_feet", 
-        "tags": {
-          "location": "coyote_creek"
-          }, 
-        "fields": data, 
-          }
-    print(dataToWrite)
-    write_api.write("iot", "Ollebo", [dataToWrite])
+    write_api.write("iot", "Ollebo", [data])
 
 
 

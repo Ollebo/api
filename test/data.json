@@ -1,9 +1,20 @@
-{
-    "type": "sensor",
-    "id": "mac ore if from device",
-    "client": "sib",
-    "from": "machine2"
+{   "client": "sib",
+    "from": "machine2",
+    "measurement":"h2o_feet", 
+    "tags": {
+      "location": "coyote_creek"
+      }, 
+    "fields": {
+        "type": "sensor",
+        "id": "mac ore if from device"
+        
+    
+    
+    
+    }
+      }
 
 
 
-}
+
+
