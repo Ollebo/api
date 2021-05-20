@@ -32,7 +32,8 @@ def getData():
 			es_index(json_payload)
 
 			# influxdb
-			add_influxdb(json_payload)
+			if add_influxdb(json_payload):
+				print("influx worked")
 
 			print(json_payload)
 			return "Data has bean accepted "	
