@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hrb-api
+spec:
+  selector:
+    matchLabels:
+      app: hrb-api
+  template:
+    metadata:
+      labels:
+        app: hrb-api
+    spec:
+      #serviceAccount§Name: samma-operator
+      containers:
+        - image: hrb/api
+          name: api
+          imagePullPolicy: Never
+          #command: ['python','-u','/code/service_watch.py']
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: hrb-api
+  name: api
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: logs.{{ .Values.cluster}}.booli.se
+spec:
+  ports:
+  - name: api
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: hrb-api
+  sessionAffinity: None
+  type: NodePort
