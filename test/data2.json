@@ -1,33 +1,27 @@
 {
-    "client": "sib",
-    "from": "machine2",
-    "device": {
-      "id": "7c:9e:bd:3b:35:ec",
-      "uptime": 80,
-      "network": {
-        "ssid": "Skynet",
-        "rssi": -62,
-        "ip": "10.0.1.71"
-      }
-    },
-    "batch": {
-      "id": "1619489031",
-      "size": 60
-    },
-    "data": {
-      "timestamp": 1619489031,
-      "sensors": {
-        "temperature": 21.03,
-        "acceleration": {
-          "x": 0.79,
-          "y": 0.06,
-          "z": 0.61
-        },
-        "rotation": {
-          "x": 0.92,
-          "y": -3.66,
-          "z": -1.65
-        }
-      }
-    }
+  "data": {
+    "timestamp": 1621887204,
+    "temp_c": 24.06,
+    "acc_x": -0.02,
+    "acc_y": -0.07,
+    "acc_z": -0.99,
+    "gyr_x": -0.49,
+    "gyr_y": -4.48,
+    "gyr_z": -1.4
+  },
+  "batch": {
+    "id": "1",
+    "size": 26
+  },
+  "client": "MATTE",
+  "from": "7c:9e:bd:3b:81:18",
+  "device": {
+    "id": "7c:9e:bd:3b:81:18",
+    "network": {},
+    "ssid": "Skynet",
+    "ip": "10.0.1.66",
+    "rssi": 0,
+    "uptime": 278,
+    "battery": 0.76
   }
+}

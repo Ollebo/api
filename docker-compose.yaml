@@ -2,17 +2,17 @@ version: '2'
 services:
   api:
     build: .
-    image: ollebo/api
+    image: ollebo/api:v2
     volumes:
       - ./:/code
-    command: tail -f /etc/fstab
+    #command: tail -f /etc/fstab
     ports:
       - 8088:8080
     environment:
       - REDISHOST=redis
       - REDISPORT=6379
       - AUTH_TOKENS=['1234','6789']
-      - ELASTICSEARCH=elasticsearch
+      - ELASTICSEARCH=http://elasticsearch:9200
       - ES_INDEX=elasticsearch
       - INDB=influxdb
       - INDB_PORT=8086
@@ -21,40 +21,49 @@ services:
       - INDB_DATABASE=ollebo
       - INDB_TOKEN=yduilsJKTS576576ASD
       - INDB_ORG=ollebo
-  #docker  depends_on: 
-  #docker    - redis
-  #redis:
-  #  image: redis
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:7.11.1
-    environment:
-      - cluster.name=docker-cluster
-      - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-      - xpack.security.enabled=false
-      - discovery.type=single-node
-  influxdb:
-    image: influxdb
-    volumes:
-      - ./influxdb/influxdb.conf:/etc/influxdb2/influxdb.conf
-    environment:
-      DOCKER_INFLUXDB_INIT_MODE: setup
-      DOCKER_INFLUXDB_INIT_USERNAME: influxdbRoot
-      DOCKER_INFLUXDB_INIT_PASSWORD: influxdbRoot
-      DOCKER_INFLUXDB_INIT_ORG: ollebo
-      DOCKER_INFLUXDB_INIT_BUCKET: fluxdb
-      DOCKER_INFLUXDB_HTTP_AUTH_ENABLED: "true"
-      DOCKER_INFLUXDB_DB: iot
-      DOCKER_INFLUXDB_USER: influxdb
-      DOCKER_INFLUXDB_USER_PASSWORD: influxdb
-      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: yduilsJKTS576576ASD
-      INFLUXDB_INIT_MODE: setup
-      INFLUXDB_INIT_USERNAME: influxdbRoot
-      INFLUXDB_INIT_PASSWORD: influxdbRoot
-      INFLUXDB_INIT_ORG: ollebo
-      INFLUXDB_INIT_BUCKET: fluxdb
-      INFLUXDB_HTTP_AUTH_ENABLED: "true"
-      INFLUXDB_DB: iot
-      INFLUXDB_USER: influxdb
-      INFLUXDB_USER_PASSWORD: influxdb
-
+      - MEILISEARCH=http://meilisearch:7700
+      - PROJECT=ollebo
+    depends_on: 
+      - redis
+    networks:
+      - ollebo
+  redis:
+    image: redis
+    networks:
+      - ollebo
+#  elasticsearch:
+#    image: docker.elastic.co/elasticsearch/elasticsearch:7.11.1
+#    environment:
+#      - cluster.name=docker-cluster
+#      - bootstrap.memory_lock=true
+#      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+#      - xpack.security.enabled=false
+#      - discovery.type=single-node
+#  influxdb:
+#    image: influxdb
+#    volumes:
+#      - ./influxdb/influxdb.conf:/etc/influxdb2/influxdb.conf
+#    environment:
+#      DOCKER_INFLUXDB_INIT_MODE: setup
+#      DOCKER_INFLUXDB_INIT_USERNAME: influxdbRoot
+#      DOCKER_INFLUXDB_INIT_PASSWORD: influxdbRoot
+#      DOCKER_INFLUXDB_INIT_ORG: ollebo
+#      DOCKER_INFLUXDB_INIT_BUCKET: fluxdb
+#      DOCKER_INFLUXDB_HTTP_AUTH_ENABLED: "true"
+#      DOCKER_INFLUXDB_DB: iot
+#      DOCKER_INFLUXDB_USER: influxdb
+#      DOCKER_INFLUXDB_USER_PASSWORD: influxdb
+#      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: yduilsJKTS576576ASD
+#      INFLUXDB_INIT_MODE: setup
+#      INFLUXDB_INIT_USERNAME: influxdbRoot
+#      INFLUXDB_INIT_PASSWORD: influxdbRoot
+#      INFLUXDB_INIT_ORG: ollebo
+#      INFLUXDB_INIT_BUCKET: fluxdb
+#      INFLUXDB_HTTP_AUTH_ENABLED: "true"
+#      INFLUXDB_DB: iot
+#      INFLUXDB_USER: influxdb
+#      INFLUXDB_USER_PASSWORD: influxdb
+#
+networks:
+  ollebo:
+    external: true

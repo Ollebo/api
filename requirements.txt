@@ -2,6 +2,8 @@ requests
 redis
 requests
 elasticsearch
+meilisearch
+ pymongo
 influxdb-client
 influxdb
 pika

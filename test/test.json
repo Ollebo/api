@@ -1,0 +1,26 @@
+{
+    "data": {
+      "timestamp": 1621887204,
+      "temp_c": 24.06,
+      "acc_x": -0.02,
+      "acc_y": -0.07,
+      "acc_z": -0.99,
+      "gyr_x": -0.49,
+      "gyr_y": -4.48,
+      "gyr_z": -1.4
+    },
+    "batch": {
+      "id": "1",
+      "size": 26
+    },
+    "device": {
+      "id": "7c:9e:bd:3b:81:18",
+      "ssid": "Skynet",
+      "ip": "10.0.1.66",
+      "rssi": 0,
+      "uptime": 278,
+      "battery": 0.76
+    }
+  }
+  
+  

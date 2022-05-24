@@ -1,0 +1,18 @@
+{
+  "client": "localhost",
+  "from": "01ea15d6e350",
+  "device": {
+    "id": "localhost",
+    "uptime": 80,
+    "network": {},
+    "ssid": "Skynet",
+    "rssi": -62,
+    "ip": "10.0.1.71"
+  },
+  "data": {
+    "timestamp": 1642166696.8626707,
+    "acc_x": 6866,
+    "acc_y": -15306,
+    "acc_z": -2265
+  }
+}
