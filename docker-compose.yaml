@@ -23,6 +23,8 @@ services:
       - INDB_ORG=ollebo
       - MEILISEARCH=http://meilisearch:7700
       - PROJECT=ollebo
+      - MONGOURL=
+      - REDIS=
     depends_on: 
       - redis
     networks:
