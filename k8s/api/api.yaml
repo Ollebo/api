@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+spec:
+  selector:
+    matchLabels:
+      app: ollebo-api
+  template:
+    metadata:
+      labels:
+        app: ollebo-api
+    spec:
+      containers:
+        - image: ollebo/api
+          name: api
+          imagePullPolicy: Always
+          env:
+            - name: REDISHOST
+              value: redis
+            - name: REDIS
+              value: redis
+            - name: REDISPORT
+              value: "6379"
+            - name: AUTH_TOKENS
+              value: "['1234','6789']"
+            - name: ELASTICSEARCH
+              value: http://elasticsearch:9200
+            - name: ES_INDEX
+              value: ollebo
+            - name: INDB
+              value: influxdb
+            - name: INDB_PORT
+              value: "8086"
+            - name: INDB_USER
+              value: influxdb
+            - name: INDB_PASSWORD
+              value: influxdb
+            - name: INDB_DATABASE
+              value: ollebo
+            - name: INDB_TOKEN
+              value: aaaaaaaaa
+            - name: INDB_ORG
+              value: ollebo
+            - name:  MEILISEARCH
+              value: http://meilisearch:7700
+            - name: PROJECT
+              value: ollebo
+            - name: MONGOURL
+              value: urlsiiii
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: ollebo-api
+  name: api
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: api.ollebo.com
+spec:
+  ports:
+  - name: api
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: api
+  sessionAffinity: None
+  type: ClusterIP

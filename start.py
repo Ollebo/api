@@ -11,10 +11,9 @@ import time
 import json
 import os
 from flask import Flask, request, render_template, url_for, redirect
-<<<<<<< HEAD
-from auth import validateToken
-from elastic import es_index
-from influx import add_influxdb
+#from auth import validateToken
+#from elastic import es_index
+#from influx import add_influxdb
 from indexMelis import addMeilsearch
 from mongoclient import getUserId, saveEvent, getProjectID
 
@@ -23,8 +22,6 @@ from mongoclient import getUserId, saveEvent, getProjectID
 #Our own data
 from storageFile import writeDataToFile
 path=os.getenv('VSTECH_URL', '/vstech/data/')
-=======
->>>>>>> 7cdd641790db4689d38fda67b50f7b7fc993719e
 
 
 ##Backends
@@ -71,7 +68,6 @@ def getData():
 	else:
 		return "message ERROR: Unauthorized", 401
 
-<<<<<<< HEAD
 @app.route('/image/', methods=['POST'])
 def upload_image():
     uploaded_file = request.files['file']
@@ -87,8 +83,6 @@ def upload_file():
     if uploaded_file.filename != '':
         uploaded_file.save(path+"/files/"+uploaded_file.filename)
     return "file Saved"
-=======
->>>>>>> 7cdd641790db4689d38fda67b50f7b7fc993719e
 
 
 
