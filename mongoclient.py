@@ -1,9 +1,11 @@
 from pymongo import MongoClient
 import redis
 import uuid
+import os
 from datetime import datetime
-# Connect to the MongoDB, change the connection string per your MongoDB environment
-uri = "mongodb://root:example@mongo:27017/mantiser?authSource=admin"
+# Connct to the MongoDB, change the connection string per your MongoDB environment
+
+uri = os.getenv('MONGOURL', 'mongodb://root:example@mongo:27017/mantiser?authSource=admin')
 client = MongoClient(uri)
 r = redis.Redis(host='redis', port=6379, db=0)
 # Set the db object to point to the business database
