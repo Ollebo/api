@@ -23,7 +23,7 @@ services:
       - INDB_ORG=ollebo
       - MEILISEARCH=http://meilisearch:7700
       - PROJECT=ollebo
-      - MONGOURL=
+      - MONGOURL=mongodb://root:example@mongo:27017/ollebo?authSource=admin
       - REDIS=
     depends_on: 
       - redis

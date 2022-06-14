@@ -5,21 +5,23 @@ import os
 from datetime import datetime
 # Connct to the MongoDB, change the connection string per your MongoDB environment
 
-uri = os.getenv('MONGOURL', 'mongodb://root:example@mongo:27017/mantiser?authSource=admin')
+uri = os.getenv('MONGOURL', 'mongodb://root:example@mongo:27017/ollebo?authSource=admin')
 client = MongoClient(uri)
 r = redis.Redis(host='redis', port=6379, db=0)
 # Set the db object to point to the business database
-db=client.mantiser
+db=client.ollebo
 # Showcasing the count() method of find, count the total number of 5 ratings 
 
 
 def getUserId(api_key):
+    print(api_key)
     redisHasKey = r.exists(api_key)
     if redisHasKey:
         print("return key from redis")
         return r.get(api_key).decode()
     else:
         userData = db.users.find_one({'api_key':api_key})
+        print("Getting user key")
         print(userData)
         if userData == None:
             print("APIkey dont match")
@@ -53,10 +55,10 @@ def getProjectID(userid,projectname):
 
             }
             id = db.project.insert_one(data)
-            return id.inserted_id
+            return str(id.inserted_id)
         else:
             r.set(requestid, str(projectData['uuid']))
-            return projectData['uuid'].decode()
+            return projectData['uuid']
 
 
 def saveEvent(data):
