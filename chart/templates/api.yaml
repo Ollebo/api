@@ -3,6 +3,7 @@ kind: Deployment
 metadata:
   name: api
 spec:
+  replicas: 2
   selector:
     matchLabels:
       app: ollebo-api
@@ -43,11 +44,15 @@ spec:
             - name: INDB_ORG
               value: ollebo
             - name:  MEILISEARCH
-              value: http://meilisearch:7700
+              value: http://meilisearch.meilisearch.svc:7700
             - name: PROJECT
               value: ollebo
             - name: MONGOURL
-              value: urlsiiii
+              valueFrom:
+                secretKeyRef:
+                  name: ollebo 
+                  key: mongouri
+                  optional: false
           resources:
             requests:
               cpu: 100m
@@ -69,6 +74,6 @@ spec:
     protocol: TCP
     targetPort: 8080
   selector:
-    app: api
+    app: ollebo-api
   sessionAffinity: None
   type: ClusterIP
