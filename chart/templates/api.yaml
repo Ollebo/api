@@ -13,7 +13,7 @@ spec:
         app: ollebo-api
     spec:
       containers:
-        - image: ollebo/api
+        - image: {{ .Values.image.repository}}:{{ .Values.image.tag }}
           name: api
           imagePullPolicy: Always
           env:
