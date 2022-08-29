@@ -55,9 +55,11 @@ def getProjectID(userid,projectname):
 
             }
             id = db.project.insert_one(data)
+            print(id)
             return str(id.inserted_id)
         else:
             r.set(requestid, str(projectData['uuid']))
+            print(projectData['uuid'])
             return projectData['uuid']
 
 
