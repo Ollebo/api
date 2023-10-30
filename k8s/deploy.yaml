@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mantiser-api
+spec:
+  selector:
+    matchLabels:
+      app: mantiser-api
+  template:
+    metadata:
+      labels:
+        app: mantiser-api
+    spec:
+      containers:
+        - image: mantiser/api
+          name: mantiser-api
+          imagePullPolicy: Never
+          env:
+            - name: melisaseearh
+              value: nats
+
+          #command: ['python','-u','/code/service_watch.py']        
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+spec:
+  ports:
+  - port: 8080
+    name: flask
+    targetPort: 8080
+  selector:
+    app: mantiser-api
+  type: LoadBalancer

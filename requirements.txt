@@ -1,0 +1,8 @@
+requests
+redis
+requests
+pika
+flask
+pymongo
+rq
+meilisearch
