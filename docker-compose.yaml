@@ -3,8 +3,7 @@ services:
   api:
     build: .
     volumes:
-      - ./code:/code
-    command: tail -f
+      - ./code:/code2
     ports:
       - 8080:8080
     environment:
