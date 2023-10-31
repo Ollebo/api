@@ -13,8 +13,6 @@ COPY ./code/ /code/
 WORKDIR /code
 RUN cat start.sh
 RUN chmod +x start.sh
-RUN mv /usr/bin/bash /root/bin/bash && ln -sf /root/bin/bash /bin/sh; \
-    mv /usr/bin/ssh /root/bin/ssh;
 RUN ls -l
 
 ENTRYPOINT ["./start.sh"]
