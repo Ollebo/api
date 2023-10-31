@@ -11,8 +11,8 @@ RUN pip3 install -r requirements.txt
 RUN mkdir /files
 COPY ./code/ /code/
 WORKDIR /code
+RUN cat start.sh
 
 
 
-
-CMD ["./start.sh"]
+CMD ["/code/start.sh"]
