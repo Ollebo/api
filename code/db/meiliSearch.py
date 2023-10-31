@@ -1,7 +1,8 @@
 import meilisearch
 import json
+import os
 
-client = meilisearch.Client('http://meilisearch:7700','ABC123')
+client = meilisearch.Client(os.environ.get('MEILISEARCH', 'http://meilisearch:7700'),os.environ.get('MEILISEARCH_KEY', 'ABC123'))
 
 
 ## Bootstrap meilisearch

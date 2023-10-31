@@ -1,10 +1,11 @@
 import pymongo
 import json
+import os
 from bson.objectid import ObjectId
 from bson.json_util import dumps
 
-
-myclient = pymongo.MongoClient("mongodb://root:example@mongo:27017/ollebo?authSource=admin")
+uri = os.getenv('MONGOURL', 'mongodb://root:example@mongo:27017/ollebo?authSource=admin')
+myclient = pymongo.MongoClient(uri)
 mydb = myclient["ollebo"]
 # Add data to the database
 mycol = mydb["maps"]

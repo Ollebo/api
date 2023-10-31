@@ -3,6 +3,7 @@ kind: Deployment
 metadata:
   name: api
 spec:
+  replicas: 2
   selector:
     matchLabels:
       app: ollebo-api
@@ -12,7 +13,7 @@ spec:
         app: ollebo-api
     spec:
       containers:
-        - image: ollebo/api
+        - image: {{ .Values.image.repository}}:{{ .Values.image.tag }}
           name: api
           imagePullPolicy: Always
           env:
@@ -44,10 +45,18 @@ spec:
               value: ollebo
             - name:  MEILISEARCH
               value: http://meilisearch:7700
+            - name:  MEILISEARCH_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: meilisearch-master-key
+                  key: MEILI_MASTER_KEY
+            - name:  MONGOURL
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-cluster-ollebo-mongouser
+                  key: connectionString.standard
             - name: PROJECT
               value: ollebo
-            - name: MONGOURL
-              value: urlsiiii
           resources:
             requests:
               cpu: 100m
@@ -69,6 +78,6 @@ spec:
     protocol: TCP
     targetPort: 8080
   selector:
-    app: api
+    app: ollebo-api
   sessionAffinity: None
   type: ClusterIP
