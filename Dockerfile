@@ -12,7 +12,7 @@ RUN mkdir /files
 COPY ./code/ /code/
 WORKDIR /code
 RUN cat start.sh
-
+RUN chmod +x start.sh
 
 
 CMD ["/code/start.sh"]
