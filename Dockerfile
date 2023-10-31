@@ -15,4 +15,6 @@ RUN cat start.sh
 RUN chmod +x start.sh
 RUN ls -l
 
-ENTRYPOINT ["./start.sh"]
+ENV FLASK_APP=start.py
+
+CMD  ["flask","run","--host=0.0.0.0","--port=8080"]
