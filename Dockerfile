@@ -15,4 +15,4 @@ RUN cat start.sh
 RUN chmod +x start.sh
 
 
-CMD ["/code/start.sh"]
+ENTRYPOINT ["./start.sh"]
