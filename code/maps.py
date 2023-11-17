@@ -1,4 +1,5 @@
 from db.mongo import *
+from db.kafka import *
 import json
 import datetime
 
@@ -6,7 +7,6 @@ def maps(payload,request):
 
     if request.method   == "POST":
         payload["recordtime"] = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f")
-        updateDataDb(payload["id"],payload)
         return {"status": "ok", "data": "Database had bean updated"}
     if request.method == "GET":
         #updateDataDb(id,jsonData)
@@ -22,4 +22,5 @@ def maps(payload,request):
             return getDataDb(lon,lat)
     if request.method == "PUT":
         payload["recordtime"] = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f")
+        addToKafka(payload)
         return addDataDb(payload)

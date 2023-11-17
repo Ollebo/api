@@ -6,3 +6,4 @@ flask
 pymongo
 rq
 meilisearch
+kafka-python
