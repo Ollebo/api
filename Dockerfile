@@ -7,14 +7,14 @@ RUN pip3 install --upgrade pip
 RUN mkdir /code
 WORKDIR /code
 COPY requirements.txt /code/
-RUN pip3 install -r requirements.txt
+
 RUN mkdir /files
 COPY ./code/ /code/
 WORKDIR /code
 RUN cat start.sh
 RUN chmod +x start.sh
 RUN ls -l
-
+RUN pip3 install -r requirements.txt
 ENV FLASK_APP=start.py
 
-CMD  ["flask","run","--host=0.0.0.0","--port=8080"]
+CMD  ["./start.sh"]
