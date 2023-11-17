@@ -1,16 +1,15 @@
 FROM python
 RUN mkdir /code
 RUN mkdir /files
-WORKDIR /code
+
 
 
 
 COPY ./code/ /code/
-COPY requirements.txt /code/
+COPY requirements.txt /
+WORKDIR /code
 
 RUN chmod +x start.sh
-RUN ls -l
-RUN pip3 install -r requirements.txt
-ENV FLASK_APP=start.py
+RUN pip3 install -r /requirements.txt
 
 CMD  ["./start.sh"]
