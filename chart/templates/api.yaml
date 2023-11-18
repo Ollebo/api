@@ -46,7 +46,7 @@ spec:
             - name:  MEILISEARCH
               value: http://meilisearch:7700
             - name:  KAFKA
-              value: redpanda-external.redpanda:9094
+              value: redpanda-external.redpanda:9093,redpanda-1.redpanda:9093,redpanda-2.redpanda:9093
             - name:  MEILISEARCH_KEY
               valueFrom:
                 secretKeyRef:
