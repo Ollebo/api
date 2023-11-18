@@ -16,7 +16,7 @@ print("Connect to kafka servers: ", kafka_servers)
 
 consumer = KafkaConsumer(
     'event',
-    security_protocol='SSL',
+    security_protocol='SASL_SSL',
     ssl_check_hostname=False,
      bootstrap_servers=kafka_servers,
      auto_offset_reset='earliest',
