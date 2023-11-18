@@ -1,4 +1,4 @@
-FROM python
+FROM python:3.9
 #Making folder for code
 RUN mkdir /code
 RUN mkdir /files
