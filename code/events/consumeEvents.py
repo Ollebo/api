@@ -11,11 +11,12 @@ from json import loads
 import json
 import os
 
-
+kafka_servers=str(os.environ.get('KAFKA', "['redpanda:9092']"))
+print("Connect to kafka servers: ", kafka_servers)
 
 consumer = KafkaConsumer(
     'event',
-     bootstrap_servers=[os.environ.get('KAFKA', 'redpanda:9092')],
+     bootstrap_servers=kafka_servers,
      auto_offset_reset='earliest',
      enable_auto_commit=True,
      group_id='event-group',
