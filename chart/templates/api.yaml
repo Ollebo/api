@@ -17,6 +17,47 @@ spec:
           secret:
             secretName: redpanda-default-cert
       containers:
+        - command:
+          - python3
+          - /code/events/consumeEvents.py
+          env:
+          - name: REDISHOST
+            value: redis
+          - name: REDIS
+            value: redis
+          - name: REDISPORT
+            value: "6379"
+          - name: ELASTICSEARCH
+            value: http://elasticsearch:9200
+          - name: ES_INDEX
+            value: ollebo
+          - name: MEILISEARCH
+            value: http://meilisearch:7700
+          - name: KAFKA
+            value: redpanda-0.redpanda.ollebo.svc.cluster.local.:9093,redpanda-1.redpanda.ollebo.svc.cluster.local.:9093,redpanda-2.redpanda.ollebo.svc.cluster.local.:9093
+          - name: MEILISEARCH_KEY
+            valueFrom:
+              secretKeyRef:
+                key: MEILI_MASTER_KEY
+                name: meilisearch-master-key
+          - name: MONGOURL
+            valueFrom:
+              secretKeyRef:
+                key: connectionString.standard
+                name: mongodb-cluster-ollebo-mongouser
+          - name: PROJECT
+            value: ollebo
+          image: {{ .Values.image.repository}}:{{ .Values.image.tag }}
+          imagePullPolicy: Always
+          name: events
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+          - mountPath: /tls/
+            name: tls
+            readOnly: true
         - image: {{ .Values.image.repository}}:{{ .Values.image.tag }}
           name: api
           imagePullPolicy: Always
@@ -32,20 +73,6 @@ spec:
             - name: ELASTICSEARCH
               value: http://elasticsearch:9200
             - name: ES_INDEX
-              value: ollebo
-            - name: INDB
-              value: influxdb
-            - name: INDB_PORT
-              value: "8086"
-            - name: INDB_USER
-              value: influxdb
-            - name: INDB_PASSWORD
-              value: influxdb
-            - name: INDB_DATABASE
-              value: ollebo
-            - name: INDB_TOKEN
-              value: aaaaaaaaa
-            - name: INDB_ORG
               value: ollebo
             - name:  MEILISEARCH
               value: http://meilisearch:7700
