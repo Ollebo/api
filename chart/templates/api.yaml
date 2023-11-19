@@ -12,6 +12,10 @@ spec:
       labels:
         app: ollebo-api
     spec:
+      volumes:
+        - name: tls
+          secret:
+            secretName: redpanda-default-cert
       containers:
         - image: {{ .Values.image.repository}}:{{ .Values.image.tag }}
           name: api
@@ -59,6 +63,10 @@ spec:
                   key: connectionString.standard
             - name: PROJECT
               value: ollebo
+          volumeMounts:
+            - name: tls
+              readOnly: true
+              mountPath: "/tls/"
           resources:
             requests:
               cpu: 100m
