@@ -50,7 +50,7 @@ spec:
             - name:  MEILISEARCH
               value: http://meilisearch:7700
             - name:  KAFKA
-              value: redpanda-0.redpanda.ollebo.svc.cluster.local:9093,redpanda-1.redpanda.ollebo.svc.cluster.local:9093,redpanda-2.redpanda.ollebo.svc.cluster.local:9093
+              value: redpanda-external.redpanda.svc.cluster.local:9094
             - name:  MEILISEARCH_KEY
               valueFrom:
                 secretKeyRef:
