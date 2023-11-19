@@ -8,7 +8,7 @@ print("Connect to kafka servers: ", kafka_servers)
 
 producer = KafkaProducer(bootstrap_servers=kafka_servers,
                              security_protocol='SSL',
-                             ssl_check_hostname=False,
+                             ssl_check_hostname='False',
                          value_serializer=lambda x: 
                          dumps(x).encode('utf-8'))
 def addToKafka(data):
