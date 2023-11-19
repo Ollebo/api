@@ -1,4 +1,4 @@
-from db.kafka import *
+from db.kafkaProducer import *
 
 
 def event(payload,request):

@@ -18,6 +18,7 @@ consumer = KafkaConsumer(
     'user-event',
     security_protocol='SSL',
     ssl_check_hostname=False,
+    ssl_cafile='/tls/ca.crt',
      bootstrap_servers=kafka_servers,
      auto_offset_reset='earliest',
      enable_auto_commit=True,
