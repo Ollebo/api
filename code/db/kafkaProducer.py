@@ -1,4 +1,4 @@
-from kafka import KafkaProducer  ,NewTopic
+from kafka import KafkaProducer
 from time import sleep
 from json import dumps
 import os
@@ -19,14 +19,14 @@ else:
                              dumps(x).encode('utf-8'))
     
 #makin topic
-topic_list = [NewTopic(name="map", num_partitions=3, replication_factor=1)]
-producer.create_topics(new_topics=topic_list, validate_only=False)
-
-topic_list = [NewTopic(name="event", num_partitions=3, replication_factor=1)]
-producer.create_topics(new_topics=topic_list, validate_only=False)
-
-topic_list = [NewTopic(name="user", num_partitions=3, replication_factor=1)]
-producer.create_topics(new_topics=topic_list, validate_only=False)
+#topic_list = [NewTopic(name="map", num_partitions=3, replication_factor=1)]
+#producer.create_topics(new_topics=topic_list, validate_only=False)
+#
+#topic_list = [NewTopic(name="event", num_partitions=3, replication_factor=1)]
+#producer.create_topics(new_topics=topic_list, validate_only=False)
+#
+#topic_list = [NewTopic(name="user", num_partitions=3, replication_factor=1)]
+#producer.create_topics(new_topics=topic_list, validate_only=False)
 
 def addToKafka(data):
     print("Adding data to kafka")
