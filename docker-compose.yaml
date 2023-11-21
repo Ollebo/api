@@ -12,7 +12,8 @@ services:
       - ES=http://elasticsearch:9200
       - MONGO=mongodb://mongo:27017
       - NATS=nats://nats:4222
-      - KAFKA=redpanda-external.redpanda.svc.cluster.local:9094
+      - KAFKA=redpanda:9092
+      - KAFKA_TLS=none
 
     networks:
       - ollebo

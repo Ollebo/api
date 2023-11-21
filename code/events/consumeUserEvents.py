@@ -12,11 +12,13 @@ import json
 import os
 
 kafka_servers=str(os.environ.get('KAFKA', "['redpanda:9092']"))
+kafka_tls=str(os.environ.get('KAFKA_TLS', "none"))
+
 print("Connect to kafka servers: ", kafka_servers)
 
 consumer = KafkaConsumer(
     'user-event',
-    security_protocol='SSL',
+    security_protocol=kafka_tls,
     ssl_check_hostname=False,
     ssl_cafile='/tls/ca.crt',
      bootstrap_servers=kafka_servers,

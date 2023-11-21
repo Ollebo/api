@@ -8,6 +8,7 @@ RUN mkdir /files
 #Copying code to container
 COPY ./code/ /code/
 COPY requirements.txt /
+COPY ca.crt /tls/ca.crt
 
 #Setting working directory
 WORKDIR /code
