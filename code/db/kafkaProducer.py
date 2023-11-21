@@ -12,7 +12,7 @@ if kafka_tls == "none":
                         dumps(x).encode('utf-8'))
 else:
     producer = KafkaProducer(bootstrap_servers=kafka_servers,
-                            security_protocol="none",
+                            security_protocol="SSL",
                             ssl_check_hostname=False,
                             ssl_cafile='/tls/ca.crt',
                              value_serializer=lambda x: 
