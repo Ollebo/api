@@ -35,7 +35,9 @@ def updateDataDb(id,json,db="maps"):
     updateJson = { "$set":  json  }
     mycol = mydb[db]
     x = mycol.update_one(filter,updateJson)
-    print(x.modified_count)
+    returnData= {"update":x.modified_count}
+    
+    return returnData
 
 def getDataDb(db="maps"):
     # Add data to the database

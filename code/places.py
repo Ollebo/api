@@ -3,17 +3,17 @@ from db.kafkaProducer import *
 import json
 import datetime
 
-def people(payload,request):
+def places(payload,request):
 
     if request.method   == "POST":
         payload["recordtime"] = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f")
         #return {"status": "ok", "data": "Database had bean updated"}
-        return updateDataDb(payload['id'],payload,"people")
+        return updateDataDb(payload['id'],payload,"places")
     if request.method == "GET":
         #updateDataDb(id,jsonData)
-        return getDataDb("people")
+        return getDataDb("places")
 
     if request.method == "PUT":
         payload["recordtime"] = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f")
         addToKafka(payload)
-        return addDataDb(payload,"people")
+        return addDataDb(payload,"places")

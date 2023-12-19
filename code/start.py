@@ -13,6 +13,7 @@ from maps import maps
 from events import event
 from project import project
 from people import people
+from places import places
 
 app = Flask(__name__)
 
@@ -34,6 +35,13 @@ def peopleRoute():
 	payload = request.get_json(silent=True)
 	#print(payload)
 	return people(payload,request)
+
+@app.route("/places/",methods = ['GET', 'POST', 'PUT'])
+def placesRoute():
+	payload = request.get_json(silent=True)
+	#print(payload)
+	return places(payload,request)
+
 
 @app.route("/project/",methods = ['GET', 'POST', 'PUT'])
 def projectRoute():
