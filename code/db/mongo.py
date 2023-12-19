@@ -21,30 +21,31 @@ def eventAddDataDb(json):
 
 
 
-def addDataDb(json):
+def addDataDb(json,db="maps"):
     # Add data to the database
     # Connect to the database
-
+    mycol = mydb[db]
     x = mycol.insert_one(json)
     return {"data":"accepted","id":dumps(x.inserted_id)}
 
-def updateDataDb(id,json):
+def updateDataDb(id,json,db="maps"):
     # Add data to the database
     # Connect to the database
     filter = {"_id": ObjectId(id)}
     updateJson = { "$set":  json  }
-
+    mycol = mydb[db]
     x = mycol.update_one(filter,updateJson)
     print(x.modified_count)
 
-def getDataDb():
+def getDataDb(db="maps"):
     # Add data to the database
     # Connect to the database
+    mycol = mydb[db]
     x = mycol.find()
     return dumps(x)
 
 #get values based on lon and lat
-def getDataDb(lon,lat):
+def getDataDbMaps(lon,lat):
     query = { "location": { "$nearSphere": { "$geometry": { "type": "Point",  "coordinates": [ lon, lat ] } } } } 
     x = mycol.find(query)
     #Convert to GEOJson format for the map

@@ -17,6 +17,7 @@ services:
 
     networks:
       - ollebo
+    command: tail -f /etc/fstab
 networks:
   ollebo:
     external: true

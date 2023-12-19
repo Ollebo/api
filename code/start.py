@@ -11,6 +11,8 @@ import json
 from flask import Flask, request, render_template, url_for, redirect, jsonify
 from maps import maps
 from events import event
+from project import project
+from people import people
 
 app = Flask(__name__)
 
@@ -26,6 +28,19 @@ def mapsRoute():
 	payload = request.get_json(silent=True)
 	#print(payload)
 	return maps(payload,request)
+
+@app.route("/people/",methods = ['GET', 'POST', 'PUT'])
+def peopleRoute():
+	payload = request.get_json(silent=True)
+	#print(payload)
+	return people(payload,request)
+
+@app.route("/project/",methods = ['GET', 'POST', 'PUT'])
+def projectRoute():
+	payload = request.get_json(silent=True)
+	#print(payload)
+	return project(payload,request)
+
 
 @app.route("/event/",methods = ['GET', 'PUT'])
 def eventsRoute():

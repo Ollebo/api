@@ -16,11 +16,11 @@ def maps(payload,request):
         print(lat)
         if lon == 1 and lat == 1:
             #We have a no lon ang lat lets dump all data
-            return getDataDb()
+            return getDataDb("maps")
         else:
             #We have a lon and lat lets find the closest
-            return getDataDb(lon,lat)
+            return getDataDbMaps(lon,lat)
     if request.method == "PUT":
         payload["recordtime"] = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f")
         addToKafka(payload)
-        return addDataDb(payload)
+        return addDataDb(payload,"maps")
