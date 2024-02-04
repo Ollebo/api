@@ -9,6 +9,7 @@ import time
 import time
 import json
 from flask import Flask, request, render_template, url_for, redirect, jsonify
+from flask_cors import CORS
 from maps import maps
 from events import event
 from project import project
@@ -16,6 +17,7 @@ from people import people
 from places import places
 
 app = Flask(__name__)
+CORS(app ,resources={r"/maps/*": {"origins": "*"}})
 
 @app.route("/sweden/towns",methods = ['GET'])
 def sweden_towns():
@@ -27,7 +29,6 @@ def sweden_towns():
 @app.route("/maps/",methods = ['GET', 'POST', 'PUT'])
 def mapsRoute():
 	payload = request.get_json(silent=True)
-	#print(payload)
 	return maps(payload,request)
 
 @app.route("/people/",methods = ['GET', 'POST', 'PUT'])

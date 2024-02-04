@@ -7,3 +7,4 @@ pymongo
 rq
 meilisearch
 kafka-python
+flask_cors

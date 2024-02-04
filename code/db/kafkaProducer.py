@@ -3,13 +3,13 @@ from time import sleep
 from json import dumps
 import os
 
-kafka_servers=str(os.environ.get('KAFKA', "['redpanda:9092']"))
+kafka_servers=str(os.environ.get('KAFKA', 'redpanda:9092'))
 kafka_tls=str(os.environ.get('KAFKA_TLS', "none"))
 print("Connect to kafka servers: ", kafka_servers)
 if kafka_tls == "none":
-    producer = KafkaProducer(bootstrap_servers=kafka_servers,
-                        value_serializer=lambda x: 
-                        dumps(x).encode('utf-8'))
+    producer = KafkaProducer(bootstrap_servers='redpanda:9092',
+                            value_serializer=lambda x: 
+                            dumps(x).encode('utf-8'))
 else:
     producer = KafkaProducer(bootstrap_servers=kafka_servers,
                             security_protocol="SSL",

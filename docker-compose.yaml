@@ -7,17 +7,16 @@ services:
     volumes:
       - ./code:/code
     ports:
-      - 8080:8080
+      - 8888:8080
     environment:
       - ES=http://elasticsearch:9200
-      - MONGO=mongodb://mongo:27017
+      - MONGOURL=mongodb://admin:admin123@mongo1:27017/ollebo?authSource=admin
       - NATS=nats://nats:4222
-      - KAFKA=redpanda:9092
-      - KAFKA_TLS=none
-
+ 
     networks:
-      - ollebo
+      - mantiser
     command: tail -f /etc/fstab
 networks:
-  ollebo:
+  mantiser:
     external: true
+
