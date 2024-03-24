@@ -62,6 +62,7 @@ def eventsRoute():
 @app.route("/", methods = ['GET', 'POST'])
 def start():
 	if request.method == 'POST':
+		print(request.get_data(as_text=True))
 		return "Move along nothing to see"
 	else:
 		return "Get along nothing to see"

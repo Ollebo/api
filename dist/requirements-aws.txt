@@ -1,0 +1,7 @@
+redis
+requests
+flask
+flask_cors
+boto3
+psycopg2
+aws-wsgi

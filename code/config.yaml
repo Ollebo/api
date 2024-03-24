@@ -1,0 +1,49 @@
+region: eu-north-1
+
+function_name: map-api
+handler: service.handler
+description: Map Api
+runtime: python3.12
+#role: lambda_basic_execution
+
+# S3 upload requires appropriate role with s3:PutObject permission
+# (ex. basic_s3_upload), a destination bucket, and the key prefix
+# bucket_name: 'example-bucket'
+# s3_key_prefix: 'path/to/file/'
+
+# if access key and secret are left blank, boto will use the credentials
+# defined in the [default] section of ~/.aws/credentials.
+aws_access_key_id: AKIATW6ZAVTCL5OE2KHC
+aws_secret_access_key:  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
+
+# dist_directory: dist
+# timeout: 15
+# memory_size: 512
+# concurrency: 500
+#
+
+# Experimental Environment variables
+environment_variables:
+      ES: http://elasticsearch:9200
+      MONGOURL: mongodb://admin:admin123@mongo1:27017/ollebo?authSource=admin
+      NATS: nats://nats:4222
+      POSTGRES_DB: ollebo
+      POSTGRES_HOST: ollebo.cluster-cn2ggecikqyp.eu-north-1.rds.amazonaws.com
+      POSTGRES_PASSWORD: ollebo
+      POSTGRES_USER: HdQq0f4K#8o4
+      LOCALSTACK: "false"
+      MAPS_SQS: https://localhost.localstack.cloud:4566/000000000000/maps
+      EVENT_SQL: https://localhost.localstack.cloud:4566/000000000000/events
+      LOCALSTACK_ENDPOINT: http://192.168.1.130:4566
+      
+
+# If `tags` is uncommented then tags will be set at creation or update
+# time.  During an update all other tags will be removed except the tags
+# listed here.
+#tags:
+#    tag_1: foo
+#    tag_2: bar
+
+# Build options
+build:
+  source_directories: db,psycopg2,psycopg2_binary.libs,events # a comma delimited list of directories in your project root that contains source to package.

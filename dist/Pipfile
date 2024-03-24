@@ -1,0 +1,21 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+redis = "*"
+requests = "*"
+flask = "*"
+flask-cors = "*"
+boto3 = "*"
+psycopg2 = "*"
+pymongo = "*"
+aws-wsgi = "*"
+zappa = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.7"
+python_full_version = "3.7.9"

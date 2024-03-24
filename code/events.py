@@ -1,9 +1,10 @@
-from db.kafkaProducer import *
+#from db.kafkaProducer import *
+from db.sqsProducer import *
 
 
 def event(payload,request):
     # Make event id 
-    addToKafkaEvent(payload)
+    addToSQSEvent(payload)
     return {"status": "ok", "data": "Event has bean accepted"}
                    
 
