@@ -1,5 +1,7 @@
 name: Docker Image CI
-
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: ${{ github.repository }}
 
 on:
   push:
@@ -15,5 +17,18 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
     - name: Build the Docker image
       run: docker build . --file Dockerfile --tag my-image-name:$(date +%s)
+    - name: Build and push Docker images
+        id: push
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
