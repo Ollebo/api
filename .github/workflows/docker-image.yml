@@ -33,3 +33,10 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+      - name: Check out Manifest
+        uses: actions/checkout@master
+        with:
+          repository: Ollebo/manifests
+          path: ./manifest
+          submodules: recursiv
+      
