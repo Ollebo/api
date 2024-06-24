@@ -28,7 +28,7 @@ except:
 # Close cursor and communication with the database
 
 
-
+#cur = conn.cursor()
 #cur.execute("""CREATE TABLE maps(
 #        id SERIAL PRIMARY KEY,
 #        name VARCHAR (250),
@@ -41,7 +41,7 @@ except:
 #        action VARCHAR (250),
 #        location geography(POINT));
 #""")
-
+#conn.commit()
 
 
 def addDataDb(json,db="maps"):

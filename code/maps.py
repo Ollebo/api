@@ -26,16 +26,16 @@ def setJsonValidate(jsonData):
 
 
 def maps(payload,request):
-    print(request["method"])
+    print(request.method)
 
-    if request["method"]   == "POST":
+    if request.method   == "POST":
         print("Update database")
         payload["recordtime"] = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f")
         if payload.get("id"):
             return updateMapDataDb(payload["id"],payload,"maps")
         else:
             return '{"error":"Missing id"}'
-    if request["method"] == "GET":
+    if request.method == "GET":
         print("Search for maps")
         #updateDataDb(id,jsonData)
         lon = 1 #request.args.get('lon', default = 1, type = float)
@@ -52,10 +52,10 @@ def maps(payload,request):
                 return getDataDbMapsPoints(lon,lat)
             else:
                 return getDataDbMaps(lon,lat)
-    if request["method"] == "PUT":
+    if request.method == "PUT":
         print("Add to database")
         payload["recordtime"] = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f")
         clearJson = setJsonValidate(payload)
-        addToSQS(clearJson)
+        #addToSQS(clearJson)
         return addDataDb(clearJson,"maps")
     

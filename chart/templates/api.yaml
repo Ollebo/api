@@ -1,3 +1,27 @@
+
+kind: Secret
+type: Opaque
+apiVersion: v1
+stringData:
+  mongouri: ""
+  KEYCLOAK_SECRET: F
+  KEYCLOAK_ID: app
+  KEYCLOAK_ISSUER: https://auth.mantiser.com/realms/master
+  KEYCLOAK_USER: MyAdmin
+  KEYCLOAK_PASSWORD: "firstpassword2223333" 
+  KEYCLOAK_URL: https://auth.mantiser.com
+  KEYCLOAK_REALM: "master"
+  KEYCLOAK_DEFAULT_ROLE: "user"
+  API_KEY: ""
+  CSE_ID: ""
+  MUATIC_AUTH: ""
+  MUATIC_URL: ""
+  NEXTAUTH_URL: ""
+metadata:
+  name: ollebo-app-demo
+  namespace: ollebo
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -12,41 +36,30 @@ spec:
       labels:
         app: ollebo-api
     spec:
-      volumes:
-        - name: tls
-          secret:
-            secretName: redpanda-default-cert
       containers:
         - command:
           - python3
           - /code/events/consumeEvents.py
           env:
+           - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: core-app
+                  key: password
           - name: REDISHOST
             value: redis
           - name: REDIS
             value: redis
           - name: REDISPORT
             value: "6379"
-          - name: ELASTICSEARCH
-            value: http://elasticsearch:9200
-          - name: ES_INDEX
-            value: ollebo
-          - name: MEILISEARCH
-            value: http://meilisearch:7700
-          - name:  KAFKA_TLS
-            value: "SSL"
-          - name: KAFKA
-            value: redpanda-0.redpanda.ollebo.svc.cluster.local.:9093,redpanda-1.redpanda.ollebo.svc.cluster.local.:9093,redpanda-2.redpanda.ollebo.svc.cluster.local.:9093
-          - name: MEILISEARCH_KEY
-            valueFrom:
-              secretKeyRef:
-                key: MEILI_MASTER_KEY
-                name: meilisearch-master-key
-          - name: MONGOURL
-            valueFrom:
-              secretKeyRef:
-                key: connectionString.standard
-                name: mongodb-cluster-ollebo-mongouser
+          - name: NATS
+            value: nats://nats:4222
+          - name: POSTGRES_DB
+            value: maps
+          - name: POSTGRES_HOST
+            value: core-rw
+          - name: POSTGRES_USER
+            value: ollebo        
           - name: PROJECT
             value: ollebo
           image: {{ .Values.image.repository}}:{{ .Values.image.tag }}
@@ -56,48 +69,28 @@ spec:
             requests:
               cpu: 100m
               memory: 128Mi
-          volumeMounts:
-          - mountPath: /tls/
-            name: tls
-            readOnly: true
         - image: {{ .Values.image.repository}}:{{ .Values.image.tag }}
           name: api
           imagePullPolicy: Always
           env:
-            - name: REDISHOST
-              value: redis
-            - name: REDIS
-              value: redis
-            - name: REDISPORT
-              value: "6379"
-            - name: AUTH_TOKENS
-              value: "['1234','6789']"
-            - name: ELASTICSEARCH
-              value: http://elasticsearch:9200
-            - name: ES_INDEX
-              value: ollebo
-            - name:  MEILISEARCH
-              value: http://meilisearch:7700
-            - name:  KAFKA_TLS
-              value: "SSL"
-            - name:  KAFKA
-              value: redpanda-0.redpanda.ollebo.svc.cluster.local.:9093,redpanda-1.redpanda.ollebo.svc.cluster.local.:9093,redpanda-2.redpanda.ollebo.svc.cluster.local.:9093
-            - name:  MEILISEARCH_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: meilisearch-master-key
-                  key: MEILI_MASTER_KEY
-            - name:  MONGOURL
-              valueFrom:
-                secretKeyRef:
-                  name: mongodb-cluster-ollebo-mongouser
-                  key: connectionString.standard
-            - name: PROJECT
-              value: ollebo
-          volumeMounts:
-            - name: tls
-              readOnly: true
-              mountPath: "/tls/"
+          - name: REDISHOST
+            value: redis
+          - name: REDIS
+            value: redis
+          - name: REDISPORT
+            value: "6379"
+          - name: NATS
+            value: nats://nats:4222
+          - name: POSTGRES_DB
+            value: maps
+          - name: POSTGRES_HOST
+            value: database
+          - name: POSTGRES_PASSWORD
+            value: ollebo
+          - name: POSTGRES_USER
+            value: ollebo           
+          - name: PROJECT
+            value: ollebo
           resources:
             requests:
               cpu: 100m
