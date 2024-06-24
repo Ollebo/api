@@ -40,7 +40,7 @@ jobs:
         uses: WyriHaximus/github-action-helm3@v3
         with:
           exec: | 
-            helm template chart/ --set image.tag=ollebo/api:latest > manifest/api/deploy.yaml
+            helm template chart/ --set image.tag=latest > manifest/api/deploy.yaml
             cat manifest/api/deploy.yaml
       - name: GIT commit and push all changed files
         env: 
