@@ -47,6 +47,7 @@ jobs:
         with:
           directory: manifest
           branch: master
+          repository: Ollebo/manifests
           github_token: ${{ secrets.TOKEN_GITHUB }}
       - name: "Call API"
         uses: indiesdev/curl@v1.1
