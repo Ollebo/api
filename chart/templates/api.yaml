@@ -14,7 +14,7 @@ kind: Deployment
 metadata:
   name: api
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: ollebo-api
@@ -32,7 +32,7 @@ spec:
           - name: POSTGRES_PASSWORD
             valueFrom:
               secretKeyRef:
-                name: core-app
+                name: ollebo-app
                 key: password
           - name: REDISHOST
             value: redis
@@ -61,6 +61,11 @@ spec:
           name: api
           imagePullPolicy: Always
           env:
+          - name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: ollebo-app
+                key: password
           - name: REDISHOST
             value: redis
           - name: REDIS
@@ -73,8 +78,6 @@ spec:
             value: maps
           - name: POSTGRES_HOST
             value: database
-          - name: POSTGRES_PASSWORD
-            value: ollebo
           - name: POSTGRES_USER
             value: ollebo           
           - name: PROJECT
