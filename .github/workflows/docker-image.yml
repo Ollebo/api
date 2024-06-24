@@ -38,6 +38,15 @@ jobs:
           repository: Ollebo/manifests
           path: ./manifest
           submodules: recursiv
+      - name: Deploy
+        uses: WyriHaximus/github-action-helm3@v3
+        with:
+          exec: helm template chart/  >> manifest/test-file.yaml
+      - name: Commit & Push changes
+        uses: actions-js/push@master
+        with:
+          directory: manifest
+          branch: master
       - name: "Call API"
         uses: indiesdev/curl@v1.1
         with:
