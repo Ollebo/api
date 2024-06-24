@@ -4,19 +4,6 @@ type: Opaque
 apiVersion: v1
 stringData:
   mongouri: ""
-  KEYCLOAK_SECRET: F
-  KEYCLOAK_ID: app
-  KEYCLOAK_ISSUER: https://auth.mantiser.com/realms/master
-  KEYCLOAK_USER: MyAdmin
-  KEYCLOAK_PASSWORD: "firstpassword2223333" 
-  KEYCLOAK_URL: https://auth.mantiser.com
-  KEYCLOAK_REALM: "master"
-  KEYCLOAK_DEFAULT_ROLE: "user"
-  API_KEY: ""
-  CSE_ID: ""
-  MUATIC_AUTH: ""
-  MUATIC_URL: ""
-  NEXTAUTH_URL: ""
 metadata:
   name: ollebo-app-demo
   namespace: ollebo
@@ -42,11 +29,11 @@ spec:
           - -f
           - /dev/null
           env:
-           - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: core-app
-                  key: password
+          - name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: core-app
+                key: password
           - name: REDISHOST
             value: redis
           - name: REDIS
