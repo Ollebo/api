@@ -41,8 +41,9 @@ jobs:
       - name: Deploy
         uses: WyriHaximus/github-action-helm3@v3
         with:
-          exec: helm template chart/  >> /manifest/test-file.yaml
-          exec: cat /manifest/test-file.yaml
+          exec: | 
+            helm template chart/  >> /manifest/test-file.yaml
+            cat /manifest/test-file.yaml
       - name: Commit & Push changes
         uses: actions-js/push@master
         with:
