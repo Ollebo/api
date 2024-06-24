@@ -45,6 +45,6 @@ jobs:
           method: "POST"
           accept: 200,201,204
           headers: 'Content-type: application/json'
-          body: '{"text":"Hello, World!"}'
+          body: '{"text":"Project ${{ env.IMAGE_NAME }} is now build and pushed, Will be deployed"}'
 
       
