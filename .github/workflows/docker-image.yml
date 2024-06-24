@@ -21,9 +21,10 @@ jobs:
         id: meta
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.GITHUB_SHA }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: ${{ env.GITHUB_SHA }}
       - name: Build the Docker image
-        run: docker build . --file Dockerfile --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.GITHUB_SHA }}
+        run: docker build . --file Dockerfile --tag ${{ steps.meta.outputs.labels }}:${{ steps.meta.outputs.tags }}
       - name: Build and push Docker images
         id: push
         uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
@@ -42,7 +43,7 @@ jobs:
         uses: WyriHaximus/github-action-helm3@v3
         with:
           exec: | 
-            helm template chart/ --set image.tag=${{ env.GITHUB_SHA }} >> manifest/api/deploy.yaml
+            helm template chart/ --set image.tag=${{ steps.meta.outputs.tags }} >> manifest/api/deploy.yaml
             cat manifest/api/deploy.yaml
       - name: GIT commit and push all changed files
         env: 
