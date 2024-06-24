@@ -43,9 +43,9 @@ spec:
           - name: NATS
             value: nats://nats:4222
           - name: POSTGRES_DB
-            value: maps
+            value: ollebo
           - name: POSTGRES_HOST
-            value: core-rw
+            value: ollebo-rw
           - name: POSTGRES_USER
             value: ollebo        
           - name: PROJECT
@@ -75,9 +75,9 @@ spec:
           - name: NATS
             value: nats://nats:4222
           - name: POSTGRES_DB
-            value: maps
+            value: ollebo
           - name: POSTGRES_HOST
-            value: database
+            value: ollebo-rw
           - name: POSTGRES_USER
             value: ollebo           
           - name: PROJECT
