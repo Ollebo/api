@@ -2,12 +2,11 @@ name: Docker Image CI
 env:
   REGISTRY: docker.io
   IMAGE_NAME: ${{ github.repository }}
-
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master","main" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "master","main" ]
 
 jobs:
 
@@ -39,4 +38,13 @@ jobs:
           repository: Ollebo/manifests
           path: ./manifest
           submodules: recursiv
+      - name: "Call API"
+        uses: indiesdev/curl@v1.1
+        with:
+          url: https://hooks.slack.com/services/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
+          method: "POST"
+          accept: 200,201,204
+          headers: 'Content-type: application/json'
+          body: '{"text":"Hello, World!"}'
+
       
