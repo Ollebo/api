@@ -36,18 +36,18 @@ jobs:
         uses: actions/checkout@master
         with:
           repository: Ollebo/manifests
-          path: ./manifest
+          path: /manifest
           ssh-key: ${{ secrets.SAM_SSH }}
       - name: Deploy
         uses: WyriHaximus/github-action-helm3@v3
         with:
-          exec: helm template chart/  >> manifest/test-file.yaml
+          exec: helm template chart/  >> /manifest/test-file.yaml
+          exec: cat /manifest/test-file.yaml
       - name: Commit & Push changes
         uses: actions-js/push@master
         with:
-          directory: manifest
+          directory: /manifest
           branch: master
-          repository: Ollebo/manifests
           github_token: ${{ secrets.TOKEN_GITHUB }}
       - name: "Call API"
         uses: indiesdev/curl@v1.1
