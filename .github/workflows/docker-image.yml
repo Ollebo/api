@@ -43,7 +43,7 @@ jobs:
         with:
           exec: | 
             helm template chart/  >> manifest/api/deploy.yaml
-            cat manifest/api/deploy.yaml
+            cat api/deploy.yaml
       - name: GIT commit and push all changed files
         env: 
           CI_COMMIT_MESSAGE: Continuous Integration Build Artifacts
