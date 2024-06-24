@@ -55,13 +55,17 @@ jobs:
           git add api/deploy.yaml
           git commit -a -m "${{ env.CI_COMMIT_MESSAGE }}"
           git push
-      - name: "Call API"
-        uses: indiesdev/curl@v1.1
+      - name: Send custom JSON data to Slack workflow
+        id: slack
+        uses: slackapi/slack-github-action@v1.26.0
         with:
-          url: https://hooks.slack.com/services/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
-          method: "POST"
-          accept: 200,201,204
-          headers: 'Content-type: application/json'
-          body: '{"text":"Project ${{ env.IMAGE_NAME }} is now build and pushed, Will be deployed"}'
+          # This data can be any valid JSON from a previous step in the GitHub Action
+          payload: |
+            {
+              "Repo": "value",
+              "Build and pushed": "bar"
+              }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       
