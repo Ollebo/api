@@ -3,7 +3,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile_build
+      dockerfile: Dockerfile
     container_name: api
     image: ollebo/api
     volumes:

@@ -1,6 +1,6 @@
 from db.postgis import *
 #from db.kafkaProducer import *
-#from db.sqsProducer import *
+from db.sqsProducer import *
 import json
 import datetime
 
@@ -56,6 +56,6 @@ def maps(payload,request):
         print("Add to database")
         payload["recordtime"] = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f")
         clearJson = setJsonValidate(payload)
-        #addToSQS(clearJson)
+        addToSQS(clearJson)
         return addDataDb(clearJson,"maps")
     

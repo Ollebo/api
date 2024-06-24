@@ -30,8 +30,8 @@ def handler(event, context):
         payload = event["body"]
     returnFromFunction = maps(payload,request)
     reply = {} 
-    reply['body'] = json.dumps(returnFromFunction)
+    reply['body'] = returnFromFunction
     reply["statusCode"] = 200 
-    reply.update({"headers": {"Content-Type": "application/json"}})
+    reply.update({"headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Credentials": True}})
     return reply
     
