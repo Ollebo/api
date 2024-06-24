@@ -61,7 +61,7 @@ jobs:
         with:
           # This data can be any valid JSON from a previous step in the GitHub Action
           payload: |
-             {"text":"Hello, World!"}
+             {"text":"The repo ${{ github.repository }} is build and ready for cluster to deploy"}
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
