@@ -37,7 +37,6 @@ jobs:
         with:
           repository: Ollebo/manifests
           path: ./manifest
-          submodules: recursiv
       - name: Deploy
         uses: WyriHaximus/github-action-helm3@v3
         with:
