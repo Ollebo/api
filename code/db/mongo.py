@@ -4,11 +4,11 @@ import os
 from bson.objectid import ObjectId
 from bson.json_util import dumps
 
-uri = os.getenv('MONGOURL', 'mongodb://admin:PpcfCj0Yyrh5S7GkFToaR0OGRGEasAucfxuTh4Tl8L4flVBBvyFvpLYKicijXSaMmqIX@dw-db:27017/ollebo?authSource=admin')
-myclient = pymongo.MongoClient(uri)
-mydb = myclient["ollebo"]
-# Add data to the database
-mycol = mydb["maps"]
+#uri = os.getenv('MONGOURL', 'mongodb://admin:PpcfCj0Yyrh5S7GkFToaR0OGRGEasAucfxuTh4Tl8L4flVBBvyFvpLYKicijXSaMmqIX@dw-db:27017/ollebo?authSource=admin')
+#myclient = pymongo.MongoClient(uri)
+#mydb = myclient["ollebo"]
+## Add data to the database
+#mycol = mydb["maps"]
 
 
 def addingIndexes():
@@ -123,4 +123,4 @@ def getDataDbMapsPoints(lon,lat):
     return geoJson
 
 
-addingIndexes()
+#addingIndexes()

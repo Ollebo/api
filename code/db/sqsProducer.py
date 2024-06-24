@@ -6,15 +6,15 @@ import os
 LOCALSTACK = os.environ.get('LOCALSTACK', False)
 MAPS_SQS = os.environ.get('MAPS_SQS', 'http://localhost:4566/000000000000/maps')
 EVENTS_SQS = os.environ.get('EVENTS_SQS', 'http://localhost:4566/000000000000/events')
-AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID', 'FAKE')
-AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY', 'FAKE')
-AWS_REGION = os.environ.get('AWS_REGION', 'us-east-1')
+AWS_ACCESS_KEY_ID_l = os.environ.get('AWS_ACCESS_KEY_ID', 'FAKE')
+AWS_SECRET_ACCESS_KEY_l = os.environ.get('AWS_SECRET_ACCESS_KEY', 'FAKE')
+AWS_REGION = os.environ.get('AWS_REGION', 'us-north-1')
 
                         
-if LOCALSTACK:
-    sqs = boto3.client('sqs',endpoint_url='http://192.168.1.130:4566',region_name=AWS_REGION,aws_access_key_id=AWS_ACCESS_KEY_ID, aws_secret_access_key=AWS_SECRET_ACCESS_KEY)
-else:
-    sqs = boto3.client('sqs',region_name=AWS_REGION,aws_access_key_id=AWS_ACCESS_KEY_ID, aws_secret_access_key=AWS_SECRET_ACCESS_KEY)
+#if LOCALSTACK:
+#    sqs = boto3.client('sqs',endpoint_url='http://192.168.1.130:4566',region_name=AWS_REGION,aws_access_key_id=AWS_ACCESS_KEY_ID_l, aws_secret_access_key=AWS_SECRET_ACCESS_KEY_l)
+#else:
+
 
 #Set Que URL
 
@@ -22,9 +22,13 @@ else:
 
 def addToSQS(data):
 # Send message to SQS queue
+    sqs = boto3.client('sqs',endpoint_url='https://vpce-01ce2f6111533ed3b-lhzab6vc.sqs.eu-north-1.vpce.amazonaws.com')
+    print("Connect to SQS" + MAPS_SQS)
+    print("Sending the message")
+
     response = sqs.send_message(
         QueueUrl=MAPS_SQS,
-        DelaySeconds=10,
+        DelaySeconds=2,
         MessageAttributes={
             'Title': {
                 'DataType': 'String',
@@ -43,6 +47,9 @@ def addToSQS(data):
 
 def addToSQSEvent(data):
 # Send message to SQS queue
+    sqs = boto3.client('sqs',endpoint_url='https://vpce-01ce2f6111533ed3b-lhzab6vc.sqs.eu-north-1.vpce.amazonaws.com')
+    print("Connect to SQS" + EVENTS_SQS)
+    print("Sending the message")
     response = sqs.send_message(
         QueueUrl=EVENTS_SQS,
         DelaySeconds=10,
