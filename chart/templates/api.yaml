@@ -38,8 +38,9 @@ spec:
     spec:
       containers:
         - command:
-          - python3
-          - /code/events/consumeEvents.py
+          - tail
+          - -f
+          - /dev/null
           env:
            - name: POSTGRES_PASSWORD
               valueFrom:
