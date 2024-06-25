@@ -29,7 +29,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ollebo/api:latest
+          tags: ollebo/api:${{ github.sha }}
       - name: Check out Manifest
         uses: actions/checkout@master
         with:
@@ -40,7 +40,7 @@ jobs:
         uses: WyriHaximus/github-action-helm3@v3
         with:
           exec: | 
-            helm template chart/ --set image.tag=latest > manifest/api/deploy.yaml
+            helm template chart/ --set image.tag=${{ github.sha }} > manifest/api/deploy.yaml
             cat manifest/api/deploy.yaml
       - name: GIT commit and push all changed files
         env: 
