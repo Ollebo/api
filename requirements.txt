@@ -4,4 +4,6 @@ boto3
 pymongo
 pg8000
 psycopg2
+nats-py
+nest_asyncio
 

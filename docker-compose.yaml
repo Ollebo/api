@@ -15,7 +15,7 @@ services:
       - MONGOURL=mongodb://admin:admin123@mongo1:27017/ollebo?authSource=admin
       - NATS=nats://nats:4222
       - POSTGRES_DB=ollebo
-      - POSTGRES_HOST=database
+      - POSTGRES_HOST=dw-server-postgres
       - POSTGRES_PASSWORD=ollebo
       - POSTGRES_USER=ollebo
       - LOCALSTACK=true
@@ -30,25 +30,28 @@ services:
 
  
     networks:
-      - mantiser
+      - dw-net
     #command: tail -f /etc/fstab
-    depends_on:
-      - database
+    #depends_on:
+    #  - database
 
-  database:
-    image: postgis/postgis
-    container_name: postgis
-    volumes:
-      - ./data:/data/db
-    ports:
-      - 27017:27017
-    environment:
-      - POSTGRES_PASSWORD=ollebo
-      - POSTGRES_USER=ollebo
-      - POSTGRES_DB=ollebo
-    networks:
-      - mantiser
+#  database:
+#    image: postgis/postgis
+#    container_name: postgis
+#    volumes:
+#      - ./data:/data/db
+#    ports:
+#      - 27017:27017
+#    environment:
+#      - POSTGRES_PASSWORD=ollebo
+#      - POSTGRES_USER=ollebo
+#      - POSTGRES_DB=ollebo
+#    networks:
+#      - mantiser
 networks:
   mantiser:
     external: true
-
+  dw-net:
+    driver: bridge
+    name: dw-net
+    external: true

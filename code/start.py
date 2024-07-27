@@ -12,7 +12,7 @@ from flask import Flask, request, render_template, url_for, redirect, jsonify
 from flask_cors import CORS
 from maps import maps
 from event import event
-#from project import project
+from missions import missions, mission
 #from people import people
 #from places import places
 
@@ -25,31 +25,23 @@ def mapsRoute():
 	payload = request.get_json(silent=True)
 	return maps(payload,request)
 
-#@app.route("/people/",methods = ['GET', 'POST', 'PUT'])
-#def peopleRoute():
-#	payload = request.get_json(silent=True)
-#	#print(payload)
-#	return people(payload,request)
-#
-#@app.route("/places/",methods = ['GET', 'POST', 'PUT'])
-#def placesRoute():
-#	payload = request.get_json(silent=True)
-#	#print(payload)
-#	return places(payload,request)
-#
-#
-#@app.route("/project/",methods = ['GET', 'POST', 'PUT'])
-#def projectRoute():
-#	payload = request.get_json(silent=True)
-#	#print(payload)
-#	return project(payload,request)
+@app.route("/missions/",methods = ['GET', 'POST', 'PUT'])
+def missionsRoute():
+	payload = request.get_json(silent=True)
+	return missions(payload,request)
+
+@app.route("/mission/<id>",methods = ['GET', 'POST', 'PUT'])
+def missionRoute(id):
+	payload = request.get_json(silent=True)
+	return mission(id,request)
 
 
-@app.route("/event/",methods = ['GET', 'PUT'])
-def eventsRoute():
+
+@app.route("/event/<mission_id>",methods = ['PUT'])
+def eventsRoute(mission_id):
 	payload = request.get_json(silent=True)
 	#print(payload)
-	return event(payload,request)
+	return event(payload,request,mission_id)
 
 
 

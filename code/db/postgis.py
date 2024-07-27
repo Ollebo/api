@@ -48,7 +48,7 @@ def addDataDb(json,db="maps"):
 
     # Add data to the database
     # Connect to the database
-    query =  "INSERT INTO maps (name, tags, status, access, originFile, mapid, accessid, action ,location) VALUES \
+    query =  "INSERT INTO maps (creator_id, name, tags, status, access, originFile, mapid, accessid, action ,location) VALUES \
     (%s, %s, %s, %s, %s, %s, %s, %s, %s);"
     #Values in order of the query
     data = (json['name'],
@@ -164,3 +164,22 @@ def getDataDbMapsPoints(lon,lat):
         geoJson["features"].append(GeoFeture)
     return geoJson
 
+####
+## Missions
+####
+def getMissions(spaceID, status):
+    print("Getting close data from db")
+    postgreSQL_select_Query = "select * from missions "
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute(postgreSQL_select_Query)
+    maps = json.dumps(cur.fetchall(), indent=4, sort_keys=True, default=str)
+    return maps
+
+
+def getMission(id):
+    print("Getting close data from db")
+    postgreSQL_select_Query = "select * from missions  where id = '"+str(id)+"'"
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute(postgreSQL_select_Query)
+    mission = json.dumps(cur.fetchall(), indent=4, sort_keys=True, default=str)
+    return mission
