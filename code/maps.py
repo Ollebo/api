@@ -31,8 +31,8 @@ def maps(payload,request):
     if request.method   == "POST":
         print("Update database")
         payload["recordtime"] = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f")
-        if payload.get("id"):
-            return updateMapDataDb(payload["id"],payload,"maps")
+        if payload.get("mapKey"):
+            return updateMapDataDb(payload,"maps")
         else:
             return '{"error":"Missing id"}'
     if request.method == "GET":

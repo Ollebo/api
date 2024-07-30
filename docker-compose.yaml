@@ -6,6 +6,7 @@ services:
       dockerfile: Dockerfile
     container_name: api
     image: ollebo/api
+    command: tail -f /etc/fstab
     volumes:
       - ./:/data
     ports:

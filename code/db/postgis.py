@@ -68,46 +68,23 @@ def addDataDb(json,db="maps"):
     return {"data":"accepted","id":"1"}
 
 
-def updateMapDataDb(id,jsonData,db="maps"):
-    # Add data to the database
-    # Connect to the database
-    print("Getting data from db")
-    postgreSQL_select_Query = "select name, access, status, action ,tags, location from maps where id = "+str(id)
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute(postgreSQL_select_Query)
-    currentData = cur.fetchall()
+def updateMapDataDb(jsonData,db="maps"):
     print(jsonData)
-    incommingJson = jsonData
-    # Do we have new locations 
-    if incommingJson.get("location"):
-        print("New locations")
-        print(incommingJson["location"])
-        currentData[0]["location"] = "Point("+str(incommingJson['location'][0])+" "+str(incommingJson['location'][1])+")"
 
-    #Updating data from the database
-    currentData[0]["access"]= incommingJson.get("access", currentData[0]['access'])
-    currentData[0]["status"]= incommingJson.get("status", currentData[0]['status'])
-    currentData[0]["action"]= incommingJson.get("action", currentData[0]['action'])
-    currentData[0]["name"]= incommingJson.get("name",currentData[0]['name'])
-    currentData[0]["tags"]= incommingJson.get("tags",currentData[0]['tags'])
-
-
-
-    query =  "UPDATE  maps SET  name = %s, tags =%s,  status=%s, access=%s, action=%s, location=%s WHERE id = "+str(id)+";"
+    query =  "UPDATE  maps SET  action = %s, mapdata =%s,  location=%s, tilesurl=%s WHERE id = %s;"
     #Values in order of the query
-    data = (currentData[0]['name'],
-            currentData[0]['tags'], 
-            currentData[0]['status'], 
-            currentData[0]['access'], 
-            currentData[0]['action'],
-            currentData[0]['location'])
+    data = ("Ready",
+            json.dumps(jsonData['mapData']), 
+            "Point("+str(jsonData['mapData']['location']['coordinates'][0])+" "+str(jsonData['mapData']['location']['coordinates'][1])+")",
+            jsonData['tilesURL'],
+            jsonData['mapKey'])
     cur = conn.cursor()
     cur.execute(query,data)
-    #conn.commit()
-    print(incommingJson["location"])
+    conn.commit()
+    print("Data saved")
 
 
-    return currentData
+    return {"data":"saved","id":id}
 
 
     
