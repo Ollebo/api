@@ -70,21 +70,30 @@ def addDataDb(json,db="maps"):
 
 def updateMapDataDb(jsonData,db="maps"):
     print(jsonData)
+    if jsonData["action"] == "error":
+        query =  "UPDATE  maps SET  action = %s  WHERE id = %s;"
+        #Values in order of the query
+        data = ("Error",
+                jsonData['mapKey'])
+        cur = conn.cursor()
+        cur.execute(query,data)
+        conn.commit()
+        
+    else:
+        query =  "UPDATE  maps SET  action = %s, mapdata =%s,  location=%s, tilesurl=%s WHERE id = %s;"
+        #Values in order of the query
+        data = ("Ready",
+                json.dumps(jsonData['mapData']), 
+                "Point("+str(jsonData['mapData']['location']['coordinates'][0])+" "+str(jsonData['mapData']['location']['coordinates'][1])+")",
+                jsonData['tilesURL'],
+                jsonData['mapKey'])
+        cur = conn.cursor()
+        cur.execute(query,data)
+        conn.commit()
+        print("Data saved")
 
-    query =  "UPDATE  maps SET  action = %s, mapdata =%s,  location=%s, tilesurl=%s WHERE id = %s;"
-    #Values in order of the query
-    data = ("Ready",
-            json.dumps(jsonData['mapData']), 
-            "Point("+str(jsonData['mapData']['location']['coordinates'][0])+" "+str(jsonData['mapData']['location']['coordinates'][1])+")",
-            jsonData['tilesURL'],
-            jsonData['mapKey'])
-    cur = conn.cursor()
-    cur.execute(query,data)
-    conn.commit()
-    print("Data saved")
 
-
-    return {"data":"saved","id":id}
+    return {"data":"saved"}
 
 
     
