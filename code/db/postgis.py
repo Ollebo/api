@@ -51,7 +51,8 @@ def addDataDb(json,db="maps"):
     query =  "INSERT INTO maps (creator_id, name, tags, status, access, originFile, mapid, accessid, action ,location) VALUES \
     (%s, %s, %s, %s, %s, %s, %s, %s, %s);"
     #Values in order of the query
-    data = (json['name'],
+    data = (json['creator_id'],
+            json['name'],
             json['tags'], 
             json['status'], 
             json['access'], 

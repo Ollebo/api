@@ -30,7 +30,7 @@ def maps(payload,request):
 
     if request.method   == "POST":
         print("Update database")
-        payload["recordtime"] = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f")
+        payload["recordtime"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
         if payload.get("mapKey"):
             return updateMapDataDb(payload,"maps")
         else:
@@ -54,7 +54,7 @@ def maps(payload,request):
                 return getDataDbMaps(lon,lat)
     if request.method == "PUT":
         print("Add to database")
-        payload["recordtime"] = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f")
+        payload["recordtime"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
         clearJson = setJsonValidate(payload)
         #addToSQS(clearJson)
         return addDataDb(clearJson,"maps")
