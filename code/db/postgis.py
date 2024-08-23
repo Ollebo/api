@@ -48,10 +48,12 @@ def addDataDb(json,db="maps"):
 
     # Add data to the database
     # Connect to the database
-    query =  "INSERT INTO maps (creator_id, name, tags, status, access, originFile, mapid, accessid, action ,location) VALUES \
-    (%s, %s, %s, %s, %s, %s, %s, %s, %s);"
+    query =  "INSERT INTO maps (creator_id, space_id, asset_id, name, tags, status, access, originFile, mapid, accessid, action ,location) VALUES \
+    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s );"
     #Values in order of the query
     data = (json['creator_id'],
+            json['space_id'],
+            json['asset_id'],
             json['name'],
             json['tags'], 
             json['status'], 
@@ -64,6 +66,7 @@ def addDataDb(json,db="maps"):
 
 
     cur = conn.cursor()
+    print(data)
     cur.execute(query,data)
     conn.commit()
     return {"data":"accepted","id":"1"}
@@ -108,7 +111,8 @@ def getDataDb(db="maps"):
     postgreSQL_select_Query = "select * from maps"
     cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute(postgreSQL_select_Query)
-    maps = json.dumps(cur.fetchall(), indent=2)
+    maps = cur.fetchall()
+    print(maps)
     return maps
 
 #get values based on lon and lat
@@ -118,7 +122,8 @@ def getDataDbMaps(lon,lat):
     postgreSQL_select_Query = "select * from maps where location <-> ST_MakePoint("+str(lon)+","+str(lat)+") > 1000"
     cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute(postgreSQL_select_Query)
-    maps = json.dumps(cur.fetchall(), indent=2)
+    maps = cur.fetchall()
+    #maps = json.dumps(cur.fetchall(), indent=2)
 
 
     return maps

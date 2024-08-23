@@ -9,9 +9,12 @@ def setJsonValidate(jsonData):
     # Set the data from the reqyest to our data standrad
     # Connect to the database
     JsonStandrad = {
+        "creator_id": jsonData.get('creator_id', '686eaeeb-383b-44d7-9754-4b2e7c0c11c7'),
         "name": jsonData.get('name', 'default'),
         "tags": jsonData.get('tags', []),
         "status": jsonData.get('status', 'unprocessed'),
+        "space_id": jsonData.get('space_id', '686eaeeb-383b-44d7-9754-4b2e7c0c11c7'),
+        "asset_id": jsonData.get('asset_id', '686eaeeb-383b-44d7-9754-4b2e7c0c11c7'),
         "access": jsonData.get('access', 'private'),
         "originFile": jsonData.get('originFile', ''),
         "mapid": jsonData.get('mapid', ''),
