@@ -107,8 +107,8 @@ def updateMapDataDb(jsonData,db="maps"):
 def getDataDb(db="maps"):
     # Add data to the database
     # Connect to the database
-    print("Getting data from db")
-    postgreSQL_select_Query = "select * from maps"
+    print("Getting data from db all")
+    postgreSQL_select_Query = "select *, ST_AsGeoJSON(location) from maps"
     cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute(postgreSQL_select_Query)
     maps = cur.fetchall()
@@ -117,7 +117,7 @@ def getDataDb(db="maps"):
 
 #get values based on lon and lat
 def getDataDbMaps(lon,lat):
-    print("Getting close data from db")
+    print("Getting close data from db ")
     print(lon,lat)
     postgreSQL_select_Query = "select * from maps where location <-> ST_MakePoint("+str(lon)+","+str(lat)+") > 1000"
     cur = conn.cursor(cursor_factory=RealDictCursor)

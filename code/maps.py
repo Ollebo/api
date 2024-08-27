@@ -46,7 +46,7 @@ def maps(payload,request):
         returnType = "none"#request.args.get('return', default = "none")
         print(lon)
         print(lat)
-        if lon == 1 and lat == 1:
+        if lon == 1 and lat == 2:
             #We have a no lon ang lat lets dump all data
             return getDataDb("maps")
         else:
