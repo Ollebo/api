@@ -3,7 +3,7 @@ import json
 import os
 import datetime
 import time
-from postgis import *
+from db.postgis import *
 
 client = meilisearch.Client(os.environ.get('MEILISEARCH', 'http://meilisearch:7700'),os.environ.get('MEILISEARCH_KEY', 'ABC123'))
 
