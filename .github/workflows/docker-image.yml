@@ -31,9 +31,10 @@ jobs:
           push: true
           tags: ollebo/api:${{ github.sha }}
       - name: Check out Manifest
-        uses: actions/checkout@master
+        uses: actions/checkout@v4
         with:
           repository: Ollebo/manifests
+          ref: main
           path: manifest
           ssh-key: ${{ secrets.SAM_SSH }}
       - name: Deploy
