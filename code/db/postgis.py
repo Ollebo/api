@@ -108,7 +108,7 @@ def getDataDb(db="maps"):
     # Add data to the database
     # Connect to the database
     print("Getting data from db all")
-    postgreSQL_select_Query = "select *, ST_AsGeoJSON(location) from maps"
+    postgreSQL_select_Query = "select *, ST_AsGeoJSON(location),TO_CHAR(created_at, 'YYYY-MM-DD') AS created_at, TO_CHAR(updated_at, 'YYYY-MM-DD') AS updated_at from maps"
     cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute(postgreSQL_select_Query)
     maps = cur.fetchall()

@@ -10,7 +10,7 @@ import time
 import json
 from flask import Flask, request, render_template, url_for, redirect, jsonify
 from flask_cors import CORS
-from maps import maps
+from maps import maps, mapsSearch
 from event import event
 from missions import missions, mission
 #from people import people
@@ -24,6 +24,12 @@ CORS(app ,resources={r"/maps/*": {"origins": "*"}})
 def mapsRoute():
 	payload = request.get_json(silent=True)
 	return maps(payload,request)
+
+@app.route("/search/",methods = ['POST'])
+def searchRoute():
+	payload = request.get_json(silent=True)
+	return mapsSearch(payload)
+
 
 @app.route("/missions/",methods = ['GET', 'POST', 'PUT'])
 def missionsRoute():

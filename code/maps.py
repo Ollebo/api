@@ -1,6 +1,7 @@
 from db.postgis import *
 #from db.kafkaProducer import *
 from db.sqsProducer import *
+from db.meiliSearch import *
 import json
 import datetime
 
@@ -25,6 +26,16 @@ def setJsonValidate(jsonData):
         
     }
     return JsonStandrad
+
+
+def mapsSearch(payload):
+    #Doing search of maps towards the meilisearch database
+    print(payload)
+    if payload == None:
+        return '{"error":"Missing search"}'
+    else:
+        print(payload)
+        return meiliSearch(payload)
 
 
 

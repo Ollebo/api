@@ -32,10 +32,19 @@ services:
  
     networks:
       - dw-net
-    #command: tail -f /etc/fstab
-    #depends_on:
-    #  - database
-
+    command: tail -f /etc/fstab
+    depends_on:
+      - meilisearch 
+  meilisearch:
+    image: getmeili/meilisearch:latest
+    ports:
+      - 7700:7700
+    networks:
+      - dw-net
+    volumes:
+      - ./meili_data:/meili_data
+    environment:
+      MEILI_MASTER_KEY: "ABC123"
 #  database:
 #    image: postgis/postgis
 #    container_name: postgis
