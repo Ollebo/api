@@ -1,4 +1,3 @@
-version: '2'
 services:
   api:
     build:
@@ -15,10 +14,14 @@ services:
       - ES=http://elasticsearch:9200
       - MONGOURL=mongodb://admin:admin123@mongo1:27017/ollebo?authSource=admin
       - NATS=nats://nats:4222
-      - POSTGRES_DB=ollebo
-      - POSTGRES_HOST=dw-server-postgres
-      - POSTGRES_PASSWORD=ollebo
-      - POSTGRES_USER=ollebo
+      - POSTGRES_DB=postgres
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PASSWORD=pass
+      - POSTGRES_USER=postgres
+      - TIMESCALE_DB=time
+      - TIMESCALE_HOST=timescale:5433
+      - TIMESCALE_PASSWORD=time
+      - TIMESCALE_USER=time
       - LOCALSTACK=true
       - MAPS_SQS=https://localhost.localstack.cloud:4566/000000000000/maps
       - EVENT_SQL=https://localhost.localstack.cloud:4566/000000000000/events
@@ -27,41 +30,28 @@ services:
       - AWS_ACCESS_KEY_ID=localstack
       - AWS_SECRET_ACCESS_KEY=localstack
       - AWS_LAMBDA_RUNTIME_API=python3.8
-
-
- 
-    networks:
-      - dw-net
-    command: tail -f /etc/fstab
     depends_on:
-      - meilisearch 
+      - meilisearch
+    networks:
+      - base
+    command: tail -f /etc/fstab
   meilisearch:
     image: getmeili/meilisearch:latest
+    container_name: meilisearch2
     ports:
       - 7700:7700
     networks:
-      - dw-net
+      - base
     volumes:
       - ./meili_data:/meili_data
     environment:
       MEILI_MASTER_KEY: "ABC123"
-#  database:
-#    image: postgis/postgis
-#    container_name: postgis
-#    volumes:
-#      - ./data:/data/db
-#    ports:
-#      - 27017:27017
-#    environment:
-#      - POSTGRES_PASSWORD=ollebo
-#      - POSTGRES_USER=ollebo
-#      - POSTGRES_DB=ollebo
-#    networks:
-#      - mantiser
+
+
+
+
 networks:
-  mantiser:
-    external: true
-  dw-net:
+  base:
     driver: bridge
-    name: dw-net
+    name: base
     external: true

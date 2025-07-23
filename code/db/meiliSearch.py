@@ -201,4 +201,4 @@ def homePage(json_data):
     userHome['user']=data['hits']
 
     return userHome
-updateSearchFromPostgis()
+#updateSearchFromPostgis()
