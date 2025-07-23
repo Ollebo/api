@@ -9,11 +9,8 @@ on:
     branches: [ "master","main" ]
 
 jobs:
-
   build:
-
     runs-on: arc-runner-set
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
