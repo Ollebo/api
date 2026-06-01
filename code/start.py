@@ -5,19 +5,40 @@
 #
 # Lissen for events from the que
 #!/usr/bin/env python
-import time
-import time
 import json
-from flask import Flask, request, render_template, url_for, redirect, jsonify
+import queue
+
+from flask import Flask, Response, request, render_template, url_for, redirect, jsonify, stream_with_context
 from flask_cors import CORS
+from flask_swagger_ui import get_swaggerui_blueprint
+from prometheus_flask_exporter import PrometheusMetrics
 from maps import maps, mapsSearch
-from event import event
+from event import event, recent
 from missions import missions, mission
-#from people import people
-#from places import places
+from openapi import OPENAPI_SPEC
+from sse_bridge import start_bridge, subscribe
+from db.postgis import getRecentEvents, conn as pg_conn
 
 app = Flask(__name__)
-CORS(app ,resources={r"/maps/*": {"origins": "*"}})
+CORS(app, resources={r"/maps/*": {"origins": "*"}, r"/event/*": {"origins": "*"}})
+metrics = PrometheusMetrics(app, path="/metrics")
+
+start_bridge()
+
+
+SWAGGER_URL = "/doc"
+API_SPEC_URL = "/doc/openapi.json"
+swaggerui_blueprint = get_swaggerui_blueprint(
+    SWAGGER_URL,
+    API_SPEC_URL,
+    config={"app_name": "Ollebo API"},
+)
+app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
+
+
+@app.route(API_SPEC_URL, methods=["GET"])
+def openapiSpec():
+    return jsonify(OPENAPI_SPEC)
 
 
 @app.route("/maps/",methods = ['GET', 'POST', 'PUT'])
@@ -46,9 +67,68 @@ def missionRoute(id):
 @app.route("/event/<mission_id>",methods = ['PUT'])
 def eventsRoute(mission_id):
 	payload = request.get_json(silent=True)
-	#print(payload)
 	return event(payload,request,mission_id)
 
+
+@app.route("/event/<mission_id>/recent", methods=['GET'])
+def eventRecentRoute(mission_id):
+	try:
+		minutes = int(request.args.get("minutes", 15))
+	except (TypeError, ValueError):
+		minutes = 15
+	return recent(mission_id, minutes)
+
+
+@app.route("/event/<mission_id>/stream", methods=['GET'])
+def eventStreamRoute(mission_id):
+	q, cancel = subscribe(mission_id)
+
+	def gen():
+		try:
+			for row in getRecentEvents(mission_id, 15):
+				yield "event: backfill\ndata: " + json.dumps(row, default=str) + "\n\n"
+			yield "event: ready\ndata: {}\n\n"
+			while True:
+				try:
+					item = q.get(timeout=15)
+					yield "event: live\ndata: " + json.dumps(item, default=str) + "\n\n"
+				except queue.Empty:
+					yield ": ping\n\n"
+		finally:
+			cancel()
+
+	return Response(
+		stream_with_context(gen()),
+		mimetype="text/event-stream",
+		headers={
+			"Cache-Control": "no-cache",
+			"X-Accel-Buffering": "no",
+			"Connection": "keep-alive",
+		},
+	)
+
+
+
+@app.route("/healthz", methods=["GET"])
+@metrics.do_not_track()
+def healthz():
+	return "ok", 200
+
+
+@app.route("/readyz", methods=["GET"])
+@metrics.do_not_track()
+def readyz():
+	try:
+		with pg_conn.cursor() as cur:
+			cur.execute("SELECT 1")
+			cur.fetchone()
+		return "ok", 200
+	except Exception as e:
+		try:
+			pg_conn.rollback()
+		except Exception:
+			pass
+		return "not ready: {}".format(e), 503
 
 
 @app.route("/", methods = ['GET', 'POST'])
@@ -58,4 +138,3 @@ def start():
 		return "Move along nothing to see"
 	else:
 		return "Get along nothing to see"
-

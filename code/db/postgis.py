@@ -67,8 +67,13 @@ def addDataDb(json,db="maps"):
 
     cur = conn.cursor()
     print(data)
-    cur.execute(query,data)
-    conn.commit()
+    try:
+        cur.execute(query, data)
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        print("addDataDb failed: {}".format(e))
+        return {"error": str(e)}
     return {"data":"accepted","id":"1"}
 
 
@@ -79,24 +84,24 @@ def updateMapDataDb(jsonData,db="maps"):
         #Values in order of the query
         data = ("Error",
                 jsonData['mapKey'])
-        cur = conn.cursor()
-        cur.execute(query,data)
-        conn.commit()
-        
     else:
         query =  "UPDATE  maps SET  action = %s, mapdata =%s,  location=%s, tilesurl=%s WHERE id = %s;"
         #Values in order of the query
         data = ("Ready",
-                json.dumps(jsonData['mapData']), 
+                json.dumps(jsonData['mapData']),
                 "Point("+str(jsonData['mapData']['location']['coordinates'][0])+" "+str(jsonData['mapData']['location']['coordinates'][1])+")",
                 jsonData['tilesURL'],
                 jsonData['mapKey'])
-        cur = conn.cursor()
-        cur.execute(query,data)
+
+    cur = conn.cursor()
+    try:
+        cur.execute(query, data)
         conn.commit()
-        print("Data saved")
-
-
+    except Exception as e:
+        conn.rollback()
+        print("updateMapDataDb failed: {}".format(e))
+        return {"error": str(e)}
+    print("Data saved")
     return {"data":"saved"}
 
 
@@ -175,3 +180,136 @@ def getMission(id):
     cur.execute(postgreSQL_select_Query)
     mission = json.dumps(cur.fetchall(), indent=4, sort_keys=True, default=str)
     return mission
+
+
+####
+## Events / mission_data
+####
+def addEvent(jsonData, db="mission_data", mission_id="none"):
+    type = jsonData.get('type', 'none')
+    db_insert_time = "now()"
+
+    temp = jsonData.get('temp', 0)
+    humidity = jsonData.get('humidity', 0)
+    geopoint = jsonData.get('geopoint', [0, 0])
+    img = jsonData.get('img', "none")
+    x = jsonData.get('x', 0)
+    y = jsonData.get('y', 0)
+    z = jsonData.get('z', 0)
+    data_val = jsonData.get('data', 0)
+    try:
+        jsonDataSql = json.dumps(jsonData['jsonData'])
+    except KeyError:
+        jsonDataSql = json.dumps({"value": "none"})
+    device = jsonData.get('device', "none")
+    try:
+        deviceJSON = json.dumps(jsonData['deviceJson'])
+    except KeyError:
+        deviceJSON = json.dumps({"value": "none"})
+
+    query = (
+        "INSERT INTO mission_data "
+        "(db_insert_time, mission, type, temperature, humidity, location, "
+        "img, x, y, z, data, jsonData, device, deviceJSON) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"
+    )
+    values = (
+        db_insert_time,
+        mission_id,
+        type,
+        temp,
+        humidity,
+        "Point({} {})".format(geopoint[0], geopoint[1]),
+        img,
+        x,
+        y,
+        z,
+        data_val,
+        jsonDataSql,
+        device,
+        deviceJSON,
+    )
+
+    cur = conn.cursor()
+    try:
+        cur.execute(query, values)
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        print("addEvent failed: {}".format(e))
+        return {"error": str(e)}
+    return {"data": "stored"}
+
+
+def getRecentEvents(mission_id, minutes=15):
+    minutes = max(1, min(int(minutes), 60))
+    query = (
+        "SELECT mission, type, temperature, humidity, "
+        "ST_AsGeoJSON(location) AS location, "
+        "img, x, y, z, data, jsonData, device, deviceJSON, "
+        "to_char(db_insert_time AT TIME ZONE 'UTC', "
+        "'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS db_insert_time "
+        "FROM mission_data "
+        "WHERE mission = %s "
+        "AND db_insert_time >= NOW() - (%s || ' minutes')::interval "
+        "ORDER BY db_insert_time ASC"
+    )
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute(query, (mission_id, str(minutes)))
+        rows = cur.fetchall()
+    except Exception as e:
+        conn.rollback()
+        print("getRecentEvents failed: {}".format(e))
+        return []
+
+    for row in rows:
+        if row.get("location"):
+            try:
+                row["location"] = json.loads(row["location"])
+            except (TypeError, ValueError):
+                pass
+    return rows
+
+
+####
+## Search (replaces Meilisearch)
+####
+def searchMaps(payload):
+    print("Searching maps in postgis")
+    name = payload.get("name")
+    tags = payload.get("tags")
+    fromdate = payload.get("fromdate")
+    todate = payload.get("todate")
+
+    clauses = []
+    params = []
+
+    if name:
+        clauses.append("name ILIKE %s")
+        params.append("%{}%".format(name))
+    if tags:
+        clauses.append("tags ILIKE %s")
+        params.append("%{}%".format(tags))
+    if fromdate:
+        clauses.append("created_at >= %s")
+        params.append(fromdate)
+    if todate:
+        clauses.append("created_at <= %s")
+        params.append(todate)
+
+    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    query = (
+        "SELECT *, ST_AsGeoJSON(location) AS geometry, "
+        "TO_CHAR(created_at, 'YYYY-MM-DD') AS created_at, "
+        "TO_CHAR(updated_at, 'YYYY-MM-DD') AS updated_at "
+        "FROM maps" + where
+    )
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute(query, params)
+        return cur.fetchall()
+    except Exception as e:
+        conn.rollback()
+        print("searchMaps failed: {}".format(e))
+        return {"error": str(e)}

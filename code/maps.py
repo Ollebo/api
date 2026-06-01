@@ -1,14 +1,10 @@
 from db.postgis import *
-#from db.kafkaProducer import *
-from db.sqsProducer import *
-from db.meiliSearch import *
+from db.natsQue import addToNats
 import json
 import datetime
 
 
 def setJsonValidate(jsonData):
-    # Set the data from the reqyest to our data standrad
-    # Connect to the database
     JsonStandrad = {
         "creator_id": jsonData.get('creator_id', '686eaeeb-383b-44d7-9754-4b2e7c0c11c7'),
         "name": jsonData.get('name', 'default'),
@@ -23,19 +19,16 @@ def setJsonValidate(jsonData):
         "action" : jsonData.get('action', ''),
         "location": jsonData.get('location', [-118.4079,33.9434]),
         "recordtime": jsonData.get('recordtime', '2020-01-01 00:00:00.000000')
-        
+
     }
     return JsonStandrad
 
 
 def mapsSearch(payload):
-    #Doing search of maps towards the meilisearch database
     print(payload)
-    if payload == None:
+    if payload is None:
         return '{"error":"Missing search"}'
-    else:
-        print(payload)
-        return meiliSearch(payload)
+    return searchMaps(payload)
 
 
 
@@ -51,17 +44,14 @@ def maps(payload,request):
             return '{"error":"Missing id"}'
     if request.method == "GET":
         print("Search for maps")
-        #updateDataDb(id,jsonData)
-        lon = 1 #request.args.get('lon', default = 1, type = float)
-        lat = 2 #request.args.get('lat', default = 1, type = float)
-        returnType = "none"#request.args.get('return', default = "none")
+        lon = 1
+        lat = 2
+        returnType = "none"
         print(lon)
         print(lat)
         if lon == 1 and lat == 2:
-            #We have a no lon ang lat lets dump all data
             return getDataDb("maps")
         else:
-            #We have a lon and lat lets find the closest
             if returnType == "points":
                 return getDataDbMapsPoints(lon,lat)
             else:
@@ -70,6 +60,9 @@ def maps(payload,request):
         print("Add to database")
         payload["recordtime"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
         clearJson = setJsonValidate(payload)
-        #addToSQS(clearJson)
-        return addDataDb(clearJson,"maps")
-    
+        result = addDataDb(clearJson,"maps")
+        try:
+            addToNats("maps", clearJson)
+        except Exception as e:
+            print("NATS publish failed: {}".format(e))
+        return result

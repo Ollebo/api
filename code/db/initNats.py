@@ -1,26 +1,42 @@
 import asyncio
-import code.db.natsQue as natsQue
 import os
+import nats
 from nats.errors import TimeoutError
 
-async def main():
-    nc = await natsQue.connect(os.getenv('NATS'))
 
-    # Create JetStream context.
+EVENTS_MAX_AGE_SECONDS = 15 * 60
+
+
+async def main():
+    nc = await nats.connect(os.getenv('NATS'))
     js = nc.jetstream()
 
-    # Persist messages on 'foo's subject.
-    await js.add_stream(name="events", subjects=["events"], )
-    await js.add_stream(name="maps", subjects=["maps","work"] )
+    try:
+        await js.add_stream(
+            name="events",
+            subjects=["events"],
+            max_age=EVENTS_MAX_AGE_SECONDS,
+        )
+    except Exception as e:
+        print("add_stream events failed (may already exist): {}".format(e))
 
-    # Create ordered consumer with flow control and heartbeats
-    # that auto resumes on failures.
+    try:
+        await js.update_stream(
+            name="events",
+            subjects=["events"],
+            max_age=EVENTS_MAX_AGE_SECONDS,
+        )
+    except Exception as e:
+        print("update_stream events failed: {}".format(e))
+
+    try:
+        await js.add_stream(name="maps", subjects=["maps", "work"])
+    except Exception as e:
+        print("add_stream maps failed (may already exist): {}".format(e))
+
     await nc.close()
 
 
-
-
-    
 if __name__ == '__main__':
     asyncio.run(main())
     print("Init nats ")

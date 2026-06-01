@@ -1,10 +1,8 @@
 flask
 flask_cors
-boto3
-pymongo
-pg8000
+flask-swagger-ui
 psycopg2
 nats-py
 nest_asyncio
-meilisearch
-
+gunicorn
+prometheus_flask_exporter

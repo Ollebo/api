@@ -1,25 +1,20 @@
 import asyncio
 import nest_asyncio
 import datetime
+import json
 import os
 import nats
 from nats.errors import TimeoutError
 
 nest_asyncio.apply()
 
-
-
-
-
 async def addNats(to,text):
 
     nc = await nats.connect("{}".format(os.getenv('NATS')))
     js = nc.jetstream()
 
-    # Stop receiving after 2 messages.
-    await js.publish(to, str(text).encode('utf8'))
+    await js.publish(to, json.dumps(text).encode('utf8'))
 
-    # Terminate connection to NATS.
     await nc.close()
 
 
