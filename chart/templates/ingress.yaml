@@ -1,9 +1,13 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: api
+  name: {{ .Release.Name }}
   annotations:
-    cert-manager.io/cluster-issuer: {{ .Values.ingress.clusterIssuer }}
+    kubernetes.io/ingress.class: {{ .Values.ingress.className | quote }}
+    kubernetes.io/tls-acme: "true"
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.clusterIssuer | quote }}
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    traefik.ingress.kubernetes.io/router.entrypoints: "websecure,web"
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   tls:
@@ -18,6 +22,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: api
+                name: {{ .Release.Name }}
                 port:
                   number: 8080

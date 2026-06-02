@@ -21,7 +21,7 @@ resources:
 ingress:
   className: traefik
   host: api.ollebo.com
-  clusterIssuer: letsencrypt-prod
+  clusterIssuer: http
 
 hpa:
   minReplicas: 2

@@ -36,7 +36,7 @@ cluster. An AI validator should confirm each one exists.
 | Dependency                    | Why                                                                                  |
 | ----------------------------- | ------------------------------------------------------------------------------------ |
 | Traefik ingress controller    | The Ingress uses `ingressClassName: traefik`                                         |
-| cert-manager + ClusterIssuer  | The Ingress uses annotation `cert-manager.io/cluster-issuer: letsencrypt-prod`       |
+| cert-manager + ClusterIssuer  | The Ingress uses annotation `cert-manager.io/cluster-issuer: http` (HTTP-01 issuer) |
 | metrics-server                | The HPA reads CPU utilization from the metrics API                                   |
 | Prometheus (kube-prometheus or similar) | The pod is annotated `prometheus.io/scrape=true` — scrape config must use the standard pod role discovery |
 
@@ -80,7 +80,7 @@ cluster. An AI validator should confirm each one exists.
 | `resources.limits.memory`    | `512Mi`                |                                          |
 | `ingress.className`          | `traefik`              |                                          |
 | `ingress.host`               | `api.ollebo.com`       | Public hostname                          |
-| `ingress.clusterIssuer`      | `letsencrypt-prod`     | cert-manager issuer                      |
+| `ingress.clusterIssuer`      | `http`                 | cert-manager ClusterIssuer name (HTTP-01) |
 | `hpa.minReplicas`            | `2`                    |                                          |
 | `hpa.maxReplicas`            | `10`                   |                                          |
 | `hpa.targetCPU`              | `70`                   | Average utilization % to scale at        |

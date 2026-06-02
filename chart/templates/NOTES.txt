@@ -4,7 +4,7 @@ Public URL:
   https://{{ .Values.ingress.host }}/
 
 Verify health from inside the cluster:
-  kubectl -n {{ .Release.Namespace }} port-forward svc/api 8080:8080
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ .Release.Name }} 8080:8080
   curl -i http://localhost:8080/healthz   # liveness
   curl -i http://localhost:8080/readyz    # readiness (checks Postgres)
   curl    http://localhost:8080/metrics   # Prometheus text format
