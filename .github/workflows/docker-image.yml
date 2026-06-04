@@ -45,6 +45,7 @@ jobs:
         uses: WyriHaximus/github-action-helm3@v3
         with:
           exec: |
+            mkdir -p manifest/api
             helm template ${{ github.event.repository.name }} chart/ --set image.tag=${{ github.sha }} > manifest/api/deploy.yaml
             cat manifest/api/deploy.yaml
       - name: GIT commit and push all changed files
