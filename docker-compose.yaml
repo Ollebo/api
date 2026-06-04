@@ -5,53 +5,58 @@ services:
       dockerfile: Dockerfile
     container_name: api
     image: ollebo/api
-    #command: tail -f /etc/fstab
     volumes:
       - ./:/data
     ports:
       - 8888:8080
     environment:
-      - ES=http://elasticsearch:9200
-      - MONGOURL=mongodb://admin:admin123@mongo1:27017/ollebo?authSource=admin
       - NATS=nats://nats:4222
-      - POSTGRES_DB=postgres
+      - POSTGRES_DB=ollebo
       - POSTGRES_HOST=postgres
-      - POSTGRES_PASSWORD=pass
-      - POSTGRES_USER=postgres
-      - TIMESCALE_DB=time
-      - TIMESCALE_HOST=timescale:5433
-      - TIMESCALE_PASSWORD=time
-      - TIMESCALE_USER=time
-      - LOCALSTACK=true
-      - MAPS_SQS=https://localhost.localstack.cloud:4566/000000000000/maps
-      - EVENT_SQL=https://localhost.localstack.cloud:4566/000000000000/events
-      - LOCALSTACK_ENDPOINT=http://192.168.1.130:4566
-      - AWS_REGION=eu-west-1
-      - AWS_ACCESS_KEY_ID=localstack
-      - AWS_SECRET_ACCESS_KEY=localstack
-      - AWS_LAMBDA_RUNTIME_API=python3.8
+      - POSTGRES_PASSWORD=ollebo
+      - POSTGRES_USER=ollebo
     depends_on:
-      - meilisearch
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
     networks:
       - base
-    command: tail -f /etc/fstab
-  meilisearch:
-    image: getmeili/meilisearch:latest
-    container_name: meilisearch2
-    ports:
-      - 7700:7700
-    networks:
-      - base
-    volumes:
-      - ./meili_data:/meili_data
+
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: postgres
     environment:
-      MEILI_MASTER_KEY: "ABC123"
+      - POSTGRES_DB=ollebo
+      - POSTGRES_USER=ollebo
+      - POSTGRES_PASSWORD=ollebo
+    ports:
+      - 5432:5432
+    volumes:
+      - ./code/db/init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ollebo -d ollebo"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks:
+      - base
+
+  nats:
+    image: nats:2.10-alpine
+    container_name: nats
+    command: ["-js", "-m", "8222"]
+    ports:
+      - 4222:4222
+      - 8222:8222
+    networks:
+      - base
 
 
-
+volumes:
+  pgdata:
 
 networks:
   base:
     driver: bridge
-    name: base
-    external: true

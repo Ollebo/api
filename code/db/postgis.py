@@ -82,13 +82,18 @@ def updateMapDataDb(jsonData,db="maps"):
     if jsonData["action"] == "error":
         query =  "UPDATE  maps SET  action = %s  WHERE id = %s;"
         #Values in order of the query
-        data = ("Error",
+        data = (jsonData['action'],
                 jsonData['mapKey'])
     else:
+        mapdata_blob = json.dumps({
+            **jsonData['mapData'],
+            'inputType': jsonData.get('inputType'),
+            'variants': jsonData.get('variants'),
+        })
         query =  "UPDATE  maps SET  action = %s, mapdata =%s,  location=%s, tilesurl=%s WHERE id = %s;"
         #Values in order of the query
-        data = ("Ready",
-                json.dumps(jsonData['mapData']),
+        data = (jsonData['action'],
+                mapdata_blob,
                 "Point("+str(jsonData['mapData']['location']['coordinates'][0])+" "+str(jsonData['mapData']['location']['coordinates'][1])+")",
                 jsonData['tilesURL'],
                 jsonData['mapKey'])
