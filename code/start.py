@@ -20,7 +20,7 @@ from sse_bridge import start_bridge, subscribe
 from db.postgis import getRecentEvents, conn as pg_conn
 
 app = Flask(__name__)
-CORS(app, resources={r"/maps/*": {"origins": "*"}, r"/event/*": {"origins": "*"}})
+CORS(app, resources={r"/*": {"origins": "*"}})
 metrics = PrometheusMetrics(app, path="/metrics")
 
 start_bridge()
