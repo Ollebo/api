@@ -1,0 +1,42 @@
+import os
+import redis
+
+_VALID_TTL = 3600
+_INVALID_TTL = 600
+_KEY_PREFIX = "mission_valid:"
+
+try:
+    client = redis.Redis(
+        host=os.environ.get("REDIS_HOST", "redis"),
+        port=int(os.environ.get("REDIS_PORT", "6379")),
+        password=os.environ.get("REDIS_PASSWORD") or None,
+        socket_connect_timeout=1,
+        socket_timeout=1,
+        decode_responses=True,
+    )
+except Exception as e:
+    print("ERROR: Could not init Redis client: {}".format(e))
+    client = None
+
+
+def getMissionValidity(mission_id):
+    if client is None:
+        return None
+    try:
+        v = client.get(_KEY_PREFIX + str(mission_id))
+    except Exception as e:
+        print("Redis GET failed: {}".format(e))
+        return None
+    if v is None:
+        return None
+    return v == "1"
+
+
+def setMissionValidity(mission_id, valid):
+    if client is None:
+        return
+    try:
+        ttl = _VALID_TTL if valid else _INVALID_TTL
+        client.set(_KEY_PREFIX + str(mission_id), "1" if valid else "0", ex=ttl)
+    except Exception as e:
+        print("Redis SET failed: {}".format(e))

@@ -187,6 +187,20 @@ def getMission(id):
     return mission
 
 
+def missionExists(mission_id):
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM missions WHERE id = %s LIMIT 1", (str(mission_id),))
+        return cur.fetchone() is not None
+    except Exception as e:
+        print("missionExists failed: {}".format(e))
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return False
+
+
 ####
 ## Events / mission_data
 ####

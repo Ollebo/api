@@ -15,10 +15,14 @@ services:
       - POSTGRES_HOST=postgres
       - POSTGRES_PASSWORD=ollebo
       - POSTGRES_USER=ollebo
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     depends_on:
       postgres:
         condition: service_healthy
       nats:
+        condition: service_started
+      redis:
         condition: service_started
     networks:
       - base
@@ -50,6 +54,14 @@ services:
     ports:
       - 4222:4222
       - 8222:8222
+    networks:
+      - base
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - 6379:6379
     networks:
       - base
 

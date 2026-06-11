@@ -6,3 +6,4 @@ nats-py
 nest_asyncio
 gunicorn
 prometheus_flask_exporter
+redis

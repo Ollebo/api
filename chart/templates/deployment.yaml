@@ -41,6 +41,10 @@ spec:
             value: ollebo
           - name: PROJECT
             value: ollebo
+          - name: REDIS_HOST
+            value: redis
+          - name: REDIS_PORT
+            value: "6379"
           livenessProbe:
             httpGet:
               path: /healthz
