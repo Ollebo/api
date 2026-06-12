@@ -24,17 +24,11 @@ aws_secret_access_key:  PWl3736gv65+76PhwSE/aWt5elUeB/4EglJMJWpq
 
 # Experimental Environment variables
 environment_variables:
-      ES: http://elasticsearch:9200
-      MONGOURL: mongodb://admin:admin123@mongo1:27017/ollebo?authSource=admin
       NATS: nats://nats:4222
       POSTGRES_DB: ollebo
       POSTGRES_HOST: ollebo.cluster-cn2ggecikqyp.eu-north-1.rds.amazonaws.com
       POSTGRES_PASSWORD: ollebo
       POSTGRES_USER: HdQq0f4K#8o4
-      LOCALSTACK: "false"
-      MAPS_SQS: https://localhost.localstack.cloud:4566/000000000000/maps
-      EVENT_SQL: https://localhost.localstack.cloud:4566/000000000000/events
-      LOCALSTACK_ENDPOINT: http://192.168.1.130:4566
       
 
 # If `tags` is uncommented then tags will be set at creation or update

@@ -48,8 +48,9 @@ RUN pip install \
 RUN pip3 install --target ${FUNCTION_DIR} psycopg2
 RUN pip3 install --target ${FUNCTION_DIR} flask
 RUN pip3 install --target ${FUNCTION_DIR} flask_cors
-RUN pip3 install --target ${FUNCTION_DIR} boto3
-RUN pip3 install --target ${FUNCTION_DIR} pymongo 
+RUN pip3 install --target ${FUNCTION_DIR} flask-swagger-ui
+RUN pip3 install --target ${FUNCTION_DIR} nats-py
+RUN pip3 install --target ${FUNCTION_DIR} nest_asyncio
 
 # Use a slim version of the base Python image to reduce the final image size
 

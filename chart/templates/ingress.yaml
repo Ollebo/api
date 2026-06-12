@@ -8,6 +8,7 @@ metadata:
     cert-manager.io/cluster-issuer: {{ .Values.ingress.clusterIssuer | quote }}
     acme.cert-manager.io/http01-edit-in-place: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: "websecure,web"
+    traefik.ingress.kubernetes.io/router.middlewares: "ollebo-https-redirect@kubernetescrd"
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   tls:

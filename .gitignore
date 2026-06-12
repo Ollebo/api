@@ -1,1 +1,7 @@
 __pycache__
+
+# Legacy on-disk snapshot kept for reference only; do not ship.
+code_old/
+
+# Local Meilisearch runtime data from previous stack — Meili is no longer used.
+meili_data/
