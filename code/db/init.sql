@@ -1,6 +1,9 @@
--- Schema for local docker-compose testing.
--- Production schema lives in a sibling repo; keep this aligned with what
--- code/db/postgis.py reads and writes.
+-- LOCAL DEV ONLY — seeds the docker-compose Postgres container.
+-- Canonical production schema lives in the dw repo at ../dw/db/tables/*.sql
+-- (with numbered migrations in ../dw/db/migrations/). Any schema change that
+-- must land in prod has to go through that repo's deploy chain; this file is
+-- allowed to drift and exists purely so `docker-compose up` works.
+-- See CLAUDE.md ("Postgres schema lives in the dw repo") for the full rule.
 
 CREATE EXTENSION IF NOT EXISTS postgis;
 

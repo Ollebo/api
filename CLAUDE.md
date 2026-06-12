@@ -20,6 +20,17 @@ Only two backends are used:
 
 The PostGIS module opens a single module-level `conn` at import time and `sys.exit()`s if the connection fails — importing `db/postgis.py` has side effects.
 
+## Postgres schema lives in the `dw` repo — not here
+
+**Every Postgres schema change (new table, column, index, migration, extension) must land in the sibling `dw` repo at `../dw`. This repo does not own the production schema.**
+
+- Canonical schema: `../dw/db/tables/*.sql` (e.g. `asset.sql` defines `missions` and the `mission_data` TimescaleDB hypertable that the api reads/writes).
+- Migrations: `../dw/db/migrations/NNN_*.sql` (numbered; add the next free number).
+- Apply locally with `pnpm run db-init` / `pnpm run db-reset` from the `dw` repo (see `dw/CLAUDE.md`).
+- Production Postgres is provisioned and updated through the `dw` deploy chain. Changing schema only in this repo will work locally and silently diverge in prod.
+
+`code/db/init.sql` in **this** repo exists *only* to seed the local `docker-compose` Postgres container (`docker-compose.yaml` mounts it at `/docker-entrypoint-initdb.d/00-init.sql`). It is a **dev-only convenience** and is allowed to drift from prod shape; do not treat it as the source of truth. When you change `dw`'s schema, mirror the change into `code/db/init.sql` *only* if local-compose dev would otherwise break. If `code/db/postgis.py` starts depending on a new column, the new column belongs in `dw` first.
+
 ## Common commands
 
 ```bash
