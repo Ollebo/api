@@ -25,7 +25,7 @@ def setJsonValidate(jsonData):
     return JsonStandrad
 
 
-_KNOWN_ACTIONS = ("makingMap", "Ready", "error")
+_KNOWN_ACTIONS = ("makingMap", "ready", "error")
 
 
 def _validate_post(payload):
@@ -40,7 +40,7 @@ def _validate_post(payload):
     if action == "makingMap":
         return []
     further = []
-    if action == "Ready" and not payload.get("tilesURL"):
+    if action == "ready" and not payload.get("tilesURL"):
         further.append("tilesURL")
     mapData = payload.get("mapData")
     if not mapData:

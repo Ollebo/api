@@ -80,7 +80,7 @@ def addDataDb(json, db="maps"):
 # permits these four status values, so map every callback to one of them.
 _ACTION_TO_STATUS = {
     "makingMap": "processing",
-    "Ready": "ready",
+    "ready": "ready",
     "error": "failed",
 }
 
