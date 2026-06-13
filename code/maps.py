@@ -25,16 +25,27 @@ def setJsonValidate(jsonData):
     return JsonStandrad
 
 
+_KNOWN_ACTIONS = ("makingMap", "Ready", "error")
+
+
 def _validate_post(payload):
     if not isinstance(payload, dict):
         return ["<body>"]
     missing = [k for k in ("mapid", "action") if not payload.get(k)]
     if missing:
         return missing
-    if payload["action"] == "error":
+    action = payload["action"]
+    if action not in _KNOWN_ACTIONS:
+        return ["action(unknown:{})".format(action)]
+    if action == "makingMap":
         return []
-    further = [k for k in ("mapData", "tilesURL") if not payload.get(k)]
-    mapData = payload.get("mapData") or {}
+    further = []
+    if action == "Ready" and not payload.get("tilesURL"):
+        further.append("tilesURL")
+    mapData = payload.get("mapData")
+    if not mapData:
+        further.append("mapData")
+        return further
     coords = (mapData.get("location") or {}).get("coordinates")
     if not (isinstance(coords, (list, tuple)) and len(coords) >= 2):
         further.append("mapData.location.coordinates")

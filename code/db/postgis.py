@@ -76,37 +76,57 @@ def addDataDb(json, db="maps"):
     return {"data": "accepted", "mapid": json.get('mapid')}
 
 
+# Worker reports progress via `action`; the maps_status_check constraint only
+# permits these four status values, so map every callback to one of them.
+_ACTION_TO_STATUS = {
+    "makingMap": "processing",
+    "Ready": "ready",
+    "error": "failed",
+}
+
+
 def updateMapDataDb(jsonData, db="maps"):
     mapid = jsonData['mapid']
     action = jsonData['action']
-    if action == "error":
-        query = "UPDATE maps SET action = %s WHERE mapid = %s;"
-        data = (action, mapid)
-    else:
-        mapdata_blob = json.dumps({
-            **jsonData['mapData'],
+    status = _ACTION_TO_STATUS.get(action)
+    if status is None:
+        print("ERROR updateMapDataDb unknown action: mapid={} action={}".format(mapid, action))
+        return {"error": "unknown action", "action": action}
+
+    sets = ["status = %s", "action = %s"]
+    params = [status, action]
+
+    mapData = jsonData.get('mapData') or {}
+    if mapData:
+        sets.append("mapdata = %s")
+        params.append(json.dumps({
+            **mapData,
             'inputType': jsonData.get('inputType'),
             'variants': jsonData.get('variants'),
-        })
-        coords = jsonData['mapData']['location']['coordinates']
-        query = (
-            "UPDATE maps SET action = %s, mapdata = %s, location = %s, tilesurl = %s "
-            "WHERE mapid = %s;"
-        )
-        data = (
-            action,
-            mapdata_blob,
-            "Point({} {})".format(coords[0], coords[1]),
-            jsonData['tilesURL'],
-            mapid,
-        )
+        }))
+        loc = mapData.get('location')
+        if loc:
+            sets.append("location = ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326)::geography")
+            params.append(json.dumps(loc))
+        area = mapData.get('area')
+        if area:
+            sets.append("area = ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326)::geography")
+            params.append(json.dumps(area))
+
+    tiles_url = jsonData.get('tilesURL')
+    if tiles_url:
+        sets.append("tilesurl = %s")
+        params.append(tiles_url)
+
+    params.append(mapid)
+    query = "UPDATE maps SET " + ", ".join(sets) + " WHERE mapid = %s::uuid;"
 
     cur = conn.cursor()
     try:
-        cur.execute(query, data)
+        cur.execute(query, params)
     except Exception as e:
         conn.rollback()
-        print("ERROR updateMapDataDb failed: mapid={} action={} err={}".format(mapid, action, e))
+        print("ERROR updateMapDataDb failed: mapid={} action={} status={} err={}".format(mapid, action, status, e))
         raise
     rowcount = cur.rowcount
     conn.commit()

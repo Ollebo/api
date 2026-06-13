@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS maps (
     accessid    VARCHAR(250),
     action      VARCHAR(250),
     location    geography(POINT),
+    area        geography(LINESTRING),
     mapdata     JSONB,
     tilesurl    TEXT,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
