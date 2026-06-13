@@ -93,7 +93,7 @@ def updateMapDataDb(jsonData, db="maps"):
         print("ERROR updateMapDataDb unknown action: mapid={} action={}".format(mapid, action))
         return {"error": "unknown action", "action": action}
 
-    sets = ["status = %s", "action = %s"]
+    sets = ["status = %s", "action = %s", "updated_at = now()"]
     params = [status, action]
 
     mapData = jsonData.get('mapData') or {}
