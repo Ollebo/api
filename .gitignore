@@ -5,3 +5,6 @@ code_old/
 
 # Local Meilisearch runtime data from previous stack — Meili is no longer used.
 meili_data/
+
+# Local test payloads for callback smoke tests; not for shipping.
+code/db/testData/
