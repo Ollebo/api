@@ -42,31 +42,39 @@ OPENAPI_SPEC = {
             "put": {
                 "tags": ["maps"],
                 "summary": "Create a map",
-                "description": "Inserts a row into the `maps` PostGIS table and publishes the payload to NATS subject `maps`.",
+                "description": "Inserts a row into the `maps` PostGIS table and publishes the payload to NATS subject `maps`. Requires `X-Api-Key` when the server has `API_KEY` set.",
+                "security": [{"ApiKeyAuth": []}],
                 "requestBody": {
                     "required": True,
                     "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MapCreate"}}},
                 },
                 "responses": {
                     "200": {
-                        "description": "Insert result. On FK or validation errors the body is `{\"error\": \"...\"}` (still 200).",
+                        "description": "Insert result.",
                         "content": {"application/json": {"schema": {"$ref": "#/components/schemas/WriteResult"}}},
-                    }
+                    },
+                    "400": {"description": "Bad payload (missing/invalid body)."},
+                    "401": {"description": "Missing or wrong `X-Api-Key` header."},
+                    "500": {"description": "Database error."},
                 },
             },
             "post": {
                 "tags": ["maps"],
                 "summary": "Update a map",
-                "description": "Updates an existing map by `mapKey`. If `action=='error'` only the action column is touched; otherwise mapdata/location/tilesURL are written.",
+                "description": "Updates an existing map by `mapid` (UUID). If `action=='error'` only the action column is touched; otherwise mapdata/location/tilesURL are written. Requires `X-Api-Key` when the server has `API_KEY` set.",
+                "security": [{"ApiKeyAuth": []}],
                 "requestBody": {
                     "required": True,
                     "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MapUpdate"}}},
                 },
                 "responses": {
                     "200": {
-                        "description": "Update result",
+                        "description": "Update result. `{\"error\":\"unknown mapid\"}` if no row matched.",
                         "content": {"application/json": {"schema": {"$ref": "#/components/schemas/WriteResult"}}},
-                    }
+                    },
+                    "400": {"description": "Bad payload (missing `mapid`/`action`, or missing `mapData`/`tilesURL` on a non-error update)."},
+                    "401": {"description": "Missing or wrong `X-Api-Key` header."},
+                    "500": {"description": "Database error."},
                 },
             },
         },
@@ -136,6 +144,14 @@ OPENAPI_SPEC = {
         },
     },
     "components": {
+        "securitySchemes": {
+            "ApiKeyAuth": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-Api-Key",
+                "description": "Shared secret matching the api's `API_KEY` env var. Required on `/maps/` writes (PUT, POST) when the server is configured with `API_KEY`.",
+            }
+        },
         "schemas": {
             "MapCreate": {
                 "type": "object",
@@ -163,12 +179,13 @@ OPENAPI_SPEC = {
             },
             "MapUpdate": {
                 "type": "object",
-                "required": ["mapKey"],
+                "required": ["mapid", "action"],
                 "properties": {
-                    "mapKey": {"type": "integer", "description": "Numeric `maps.id` to update"},
-                    "action": {"type": "string", "example": "ready"},
+                    "mapid": {"type": "string", "format": "uuid", "description": "UUID of the map row to update (`maps.mapid`)."},
+                    "action": {"type": "string", "example": "ready", "description": "`ready`/`partial` for successful runs; `error` if the worker failed (only the action column is updated in that case)."},
                     "mapData": {
                         "type": "object",
+                        "description": "Required when `action != 'error'`.",
                         "properties": {
                             "location": {
                                 "type": "object",
@@ -178,7 +195,7 @@ OPENAPI_SPEC = {
                             }
                         },
                     },
-                    "tilesURL": {"type": "string", "format": "uri"},
+                    "tilesURL": {"type": "string", "format": "uri", "description": "Required when `action != 'error'`."},
                 },
             },
             "Map": {

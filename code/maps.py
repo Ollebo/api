@@ -1,6 +1,6 @@
 from db.postgis import *
 from db.natsQue import addToNats
-import json
+from flask import jsonify
 import datetime
 
 
@@ -24,6 +24,22 @@ def setJsonValidate(jsonData):
     return JsonStandrad
 
 
+def _validate_post(payload):
+    if not isinstance(payload, dict):
+        return ["<body>"]
+    missing = [k for k in ("mapid", "action") if not payload.get(k)]
+    if missing:
+        return missing
+    if payload["action"] == "error":
+        return []
+    further = [k for k in ("mapData", "tilesURL") if not payload.get(k)]
+    mapData = payload.get("mapData") or {}
+    coords = (mapData.get("location") or {}).get("coordinates")
+    if not (isinstance(coords, (list, tuple)) and len(coords) >= 2):
+        further.append("mapData.location.coordinates")
+    return further
+
+
 def mapsSearch(payload):
     print(payload)
     if payload is None:
@@ -37,11 +53,21 @@ def maps(payload,request):
 
     if request.method   == "POST":
         print("Update database")
+        if payload is None:
+            print("ERROR POST /maps/ bad payload: missing=['<body>']")
+            return jsonify({"error": "missing body", "missing": ["<body>"]}), 400
         payload["recordtime"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
-        if payload.get("mapKey"):
-            return updateMapDataDb(payload,"maps")
-        else:
-            return '{"error":"Missing id"}'
+        missing = _validate_post(payload)
+        if missing:
+            print("ERROR POST /maps/ bad payload: missing={} mapid={} action={} keys={}".format(
+                missing, payload.get("mapid"), payload.get("action"), sorted(payload.keys())
+            ))
+            return jsonify({"error": "invalid payload", "missing": missing}), 400
+        try:
+            return updateMapDataDb(payload, "maps")
+        except Exception as e:
+            print("ERROR POST /maps/ db error: mapid={} err={}".format(payload.get("mapid"), e))
+            return jsonify({"error": "db error", "detail": str(e)}), 500
     if request.method == "GET":
         print("Search for maps")
         lon = 1
@@ -58,9 +84,16 @@ def maps(payload,request):
                 return getDataDbMaps(lon,lat)
     if request.method == "PUT":
         print("Add to database")
+        if payload is None:
+            print("ERROR PUT /maps/ bad payload: missing=['<body>']")
+            return jsonify({"error": "missing body"}), 400
         payload["recordtime"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
         clearJson = setJsonValidate(payload)
-        result = addDataDb(clearJson,"maps")
+        try:
+            result = addDataDb(clearJson, "maps")
+        except Exception as e:
+            print("ERROR PUT /maps/ db error: mapid={} err={}".format(clearJson.get("mapid"), e))
+            return jsonify({"error": "db error", "detail": str(e)}), 500
         try:
             addToNats("maps", clearJson)
         except Exception as e:

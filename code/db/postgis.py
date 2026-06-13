@@ -44,70 +44,76 @@ except:
 #conn.commit()
 
 
-def addDataDb(json,db="maps"):
-
-    # Add data to the database
-    # Connect to the database
-    query =  "INSERT INTO maps (creator_id, space_id, asset_id, name, tags, status, access, originFile, mapid, accessid, action ,location) VALUES \
-    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s );"
-    #Values in order of the query
-    data = (json['creator_id'],
-            json['space_id'],
-            json['asset_id'],
-            json['name'],
-            json['tags'], 
-            json['status'], 
-            json['access'], 
-            json['originFile'], 
-            json['mapid'], 
-            json['accessid'], 
-            json['action'], 
-            "Point("+str(json['location'][0])+" "+str(json['location'][1])+")")
-
+def addDataDb(json, db="maps"):
+    query = (
+        "INSERT INTO maps (creator_id, space_id, asset_id, name, tags, status, "
+        "access, originFile, mapid, accessid, action, location) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"
+    )
+    data = (
+        json['creator_id'],
+        json['space_id'],
+        json['asset_id'],
+        json['name'],
+        json['tags'],
+        json['status'],
+        json['access'],
+        json['originFile'],
+        json['mapid'],
+        json['accessid'],
+        json['action'],
+        "Point({} {})".format(json['location'][0], json['location'][1]),
+    )
 
     cur = conn.cursor()
-    print(data)
     try:
         cur.execute(query, data)
         conn.commit()
     except Exception as e:
         conn.rollback()
-        print("addDataDb failed: {}".format(e))
-        return {"error": str(e)}
-    return {"data":"accepted","id":"1"}
+        print("ERROR addDataDb failed: mapid={} err={}".format(json.get('mapid'), e))
+        raise
+    return {"data": "accepted", "mapid": json.get('mapid')}
 
 
-def updateMapDataDb(jsonData,db="maps"):
-    print(jsonData)
-    if jsonData["action"] == "error":
-        query =  "UPDATE  maps SET  action = %s  WHERE id = %s;"
-        #Values in order of the query
-        data = (jsonData['action'],
-                jsonData['mapKey'])
+def updateMapDataDb(jsonData, db="maps"):
+    mapid = jsonData['mapid']
+    action = jsonData['action']
+    if action == "error":
+        query = "UPDATE maps SET action = %s WHERE mapid = %s;"
+        data = (action, mapid)
     else:
         mapdata_blob = json.dumps({
             **jsonData['mapData'],
             'inputType': jsonData.get('inputType'),
             'variants': jsonData.get('variants'),
         })
-        query =  "UPDATE  maps SET  action = %s, mapdata =%s,  location=%s, tilesurl=%s WHERE id = %s;"
-        #Values in order of the query
-        data = (jsonData['action'],
-                mapdata_blob,
-                "Point("+str(jsonData['mapData']['location']['coordinates'][0])+" "+str(jsonData['mapData']['location']['coordinates'][1])+")",
-                jsonData['tilesURL'],
-                jsonData['mapKey'])
+        coords = jsonData['mapData']['location']['coordinates']
+        query = (
+            "UPDATE maps SET action = %s, mapdata = %s, location = %s, tilesurl = %s "
+            "WHERE mapid = %s;"
+        )
+        data = (
+            action,
+            mapdata_blob,
+            "Point({} {})".format(coords[0], coords[1]),
+            jsonData['tilesURL'],
+            mapid,
+        )
 
     cur = conn.cursor()
     try:
         cur.execute(query, data)
-        conn.commit()
     except Exception as e:
         conn.rollback()
-        print("updateMapDataDb failed: {}".format(e))
-        return {"error": str(e)}
-    print("Data saved")
-    return {"data":"saved"}
+        print("ERROR updateMapDataDb failed: mapid={} action={} err={}".format(mapid, action, e))
+        raise
+    rowcount = cur.rowcount
+    conn.commit()
+    if rowcount == 0:
+        print("ERROR updateMapDataDb no row matched: mapid={} action={}".format(mapid, action))
+        return {"error": "unknown mapid", "mapid": mapid}
+    return {"data": "saved", "mapid": mapid}
 
 
     

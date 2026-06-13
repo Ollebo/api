@@ -10,6 +10,7 @@ services:
     ports:
       - 8888:8080
     environment:
+      - API_KEY=dev-key
       - NATS=nats://nats:4222
       - POSTGRES_DB=ollebo
       - POSTGRES_HOST=postgres

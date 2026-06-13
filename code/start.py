@@ -6,6 +6,7 @@
 # Lissen for events from the que
 #!/usr/bin/env python
 import json
+import os
 import queue
 
 from flask import Flask, Response, request, render_template, url_for, redirect, jsonify, stream_with_context
@@ -26,6 +27,22 @@ metrics = PrometheusMetrics(app, path="/metrics")
 start_bridge()
 
 
+API_KEY = os.environ.get("API_KEY")
+if not API_KEY:
+    print("WARN: API_KEY not set -- /maps/ writes are unauthenticated")
+
+
+def _require_api_key():
+    if not API_KEY:
+        return None
+    if request.headers.get("X-Api-Key") != API_KEY:
+        print("ERROR /maps/ unauthorized: method={} ip={}".format(
+            request.method, request.headers.get("X-Forwarded-For", request.remote_addr)
+        ))
+        return jsonify({"error": "unauthorized"}), 401
+    return None
+
+
 SWAGGER_URL = "/doc"
 API_SPEC_URL = "/doc/openapi.json"
 swaggerui_blueprint = get_swaggerui_blueprint(
@@ -43,6 +60,10 @@ def openapiSpec():
 
 @app.route("/maps/",methods = ['GET', 'POST', 'PUT'])
 def mapsRoute():
+	if request.method in ('PUT', 'POST'):
+		unauthorized = _require_api_key()
+		if unauthorized is not None:
+			return unauthorized
 	payload = request.get_json(silent=True)
 	return maps(payload,request)
 
