@@ -2,6 +2,7 @@ from db.postgis import *
 from db.natsQue import addToNats
 from flask import jsonify
 import datetime
+import uuid
 
 
 def setJsonValidate(jsonData):
@@ -10,7 +11,7 @@ def setJsonValidate(jsonData):
         "name": jsonData.get('name', 'default'),
         "tags": jsonData.get('tags', []),
         "status": jsonData.get('status', 'unprocessed'),
-        "space_id": jsonData.get('space_id', '686eaeeb-383b-44d7-9754-4b2e7c0c11c7'),
+        "space_id": jsonData.get('space_id'),
         "asset_id": jsonData.get('asset_id', '686eaeeb-383b-44d7-9754-4b2e7c0c11c7'),
         "access": jsonData.get('access', 'private'),
         "originFile": jsonData.get('originFile', ''),
@@ -89,6 +90,11 @@ def maps(payload,request):
             return jsonify({"error": "missing body"}), 400
         payload["recordtime"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
         clearJson = setJsonValidate(payload)
+        try:
+            uuid.UUID(str(clearJson["space_id"]))
+        except (ValueError, AttributeError, TypeError):
+            print("ERROR PUT /maps/ bad space_id: value={!r}".format(clearJson.get("space_id")))
+            return jsonify({"error": "invalid space_id"}), 400
         try:
             result = addDataDb(clearJson, "maps")
         except Exception as e:

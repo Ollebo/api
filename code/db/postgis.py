@@ -207,6 +207,40 @@ def missionExists(mission_id):
         return False
 
 
+def getSpaceKey(space_id):
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT key FROM space WHERE id = %s LIMIT 1", (str(space_id),))
+        row = cur.fetchone()
+    except Exception as e:
+        print("getSpaceKey failed: space_id={} err={}".format(space_id, e))
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return None
+    if row is None:
+        return None
+    return row[0]
+
+
+def getMapSpaceId(mapid):
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT space_id::text FROM maps WHERE mapid = %s LIMIT 1", (str(mapid),))
+        row = cur.fetchone()
+    except Exception as e:
+        print("getMapSpaceId failed: mapid={} err={}".format(mapid, e))
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return None
+    if row is None:
+        return None
+    return row[0]
+
+
 ####
 ## Events / mission_data
 ####

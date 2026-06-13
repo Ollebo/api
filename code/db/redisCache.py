@@ -5,6 +5,10 @@ _VALID_TTL = 3600
 _INVALID_TTL = 600
 _KEY_PREFIX = "mission_valid:"
 
+_SPACE_KEY_PREFIX = "space_key:"
+_SPACE_KEY_TTL = 300
+_SPACE_KEY_MISS_TTL = 60
+
 try:
     client = redis.Redis(
         host=os.environ.get("REDIS_HOST", "redis"),
@@ -38,5 +42,29 @@ def setMissionValidity(mission_id, valid):
     try:
         ttl = _VALID_TTL if valid else _INVALID_TTL
         client.set(_KEY_PREFIX + str(mission_id), "1" if valid else "0", ex=ttl)
+    except Exception as e:
+        print("Redis SET failed: {}".format(e))
+
+
+# Per-space API key cache.
+# Stored plaintext (internal Redis, short TTL); revisit if Redis ever leaves the
+# private network. Empty string is a sentinel for cached miss (space row absent
+# or space.key NULL) so we don't re-query Postgres on every unauthorized request.
+def getCachedSpaceKey(space_id):
+    if client is None:
+        return None
+    try:
+        return client.get(_SPACE_KEY_PREFIX + str(space_id))
+    except Exception as e:
+        print("Redis GET failed: {}".format(e))
+        return None
+
+
+def setCachedSpaceKey(space_id, key):
+    if client is None:
+        return
+    try:
+        ttl = _SPACE_KEY_TTL if key else _SPACE_KEY_MISS_TTL
+        client.set(_SPACE_KEY_PREFIX + str(space_id), key or "", ex=ttl)
     except Exception as e:
         print("Redis SET failed: {}".format(e))

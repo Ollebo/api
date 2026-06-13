@@ -7,6 +7,20 @@
 
 CREATE EXTENSION IF NOT EXISTS postgis;
 
+-- Minimal stand-in for the canonical `space` table in `../dw/db/tables/asset.sql`.
+-- Only the columns the api's auth path reads are present (id, key) plus `name`
+-- for readability. If `code/auth.py` or `code/db/postgis.py` starts depending
+-- on more columns, add them to dw first, then mirror here.
+CREATE TABLE IF NOT EXISTS space (
+    id   UUID PRIMARY KEY,
+    key  VARCHAR(255),
+    name VARCHAR(250)
+);
+
+INSERT INTO space (id, key, name)
+VALUES ('686eaeeb-383b-44d7-9754-4b2e7c0c11c7', 'dev-key', 'dev')
+ON CONFLICT (id) DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS maps (
     id          SERIAL PRIMARY KEY,
     creator_id  UUID,

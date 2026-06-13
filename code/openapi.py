@@ -32,6 +32,7 @@ OPENAPI_SPEC = {
             "get": {
                 "tags": ["maps"],
                 "summary": "List all maps",
+                "description": "Unauthenticated.",
                 "responses": {
                     "200": {
                         "description": "Array of map rows from PostGIS",
@@ -42,7 +43,7 @@ OPENAPI_SPEC = {
             "put": {
                 "tags": ["maps"],
                 "summary": "Create a map",
-                "description": "Inserts a row into the `maps` PostGIS table and publishes the payload to NATS subject `maps`. Requires `X-Api-Key` when the server has `API_KEY` set.",
+                "description": "Inserts a row into the `maps` PostGIS table and publishes the payload to NATS subject `maps`. Requires `X-Api-Key` matching the target space's `key` (from the `space` table). `space_id` is required in the body and must be a valid UUID. The server's `API_KEY` env var, if set, is accepted as an admin override.",
                 "security": [{"ApiKeyAuth": []}],
                 "requestBody": {
                     "required": True,
@@ -61,7 +62,7 @@ OPENAPI_SPEC = {
             "post": {
                 "tags": ["maps"],
                 "summary": "Update a map",
-                "description": "Updates an existing map by `mapid` (UUID). If `action=='error'` only the action column is touched; otherwise mapdata/location/tilesURL are written. Requires `X-Api-Key` when the server has `API_KEY` set.",
+                "description": "Updates an existing map by `mapid` (UUID). If `action=='error'` only the action column is touched; otherwise mapdata/location/tilesURL are written. Requires `X-Api-Key` matching the `key` of the space that owns the existing map row (client-supplied `space_id` is ignored on this endpoint). The server's `API_KEY` env var, if set, is accepted as an admin override. Unknown or unauthorized mapids return 401 (not 404) to avoid leaking existence.",
                 "security": [{"ApiKeyAuth": []}],
                 "requestBody": {
                     "required": True,
@@ -82,7 +83,7 @@ OPENAPI_SPEC = {
             "post": {
                 "tags": ["search"],
                 "summary": "Search maps",
-                "description": "Postgres ILIKE search on `name` and `tags`, optionally bounded by `created_at` range.",
+                "description": "Postgres ILIKE search on `name` and `tags`, optionally bounded by `created_at` range. Unauthenticated.",
                 "requestBody": {
                     "required": True,
                     "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SearchQuery"}}},
@@ -149,7 +150,7 @@ OPENAPI_SPEC = {
                 "type": "apiKey",
                 "in": "header",
                 "name": "X-Api-Key",
-                "description": "Shared secret matching the api's `API_KEY` env var. Required on `/maps/` writes (PUT, POST) when the server is configured with `API_KEY`.",
+                "description": "Per-space API key from `space.key`. On PUT, must match the key of the space named in the request body. On POST, must match the key of the space that owns the target `mapid`. The server's `API_KEY` env var, when set, is accepted as an admin override.",
             }
         },
         "schemas": {

@@ -19,6 +19,7 @@ from missions import missions, mission
 from openapi import OPENAPI_SPEC
 from sse_bridge import start_bridge, subscribe
 from db.postgis import getRecentEvents, conn as pg_conn
+from auth import verify_map_request
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -27,20 +28,8 @@ metrics = PrometheusMetrics(app, path="/metrics")
 start_bridge()
 
 
-API_KEY = os.environ.get("API_KEY")
-if not API_KEY:
-    print("WARN: API_KEY not set -- /maps/ writes are unauthenticated")
-
-
-def _require_api_key():
-    if not API_KEY:
-        return None
-    if request.headers.get("X-Api-Key") != API_KEY:
-        print("ERROR /maps/ unauthorized: method={} ip={}".format(
-            request.method, request.headers.get("X-Forwarded-For", request.remote_addr)
-        ))
-        return jsonify({"error": "unauthorized"}), 401
-    return None
+if not os.environ.get("API_KEY"):
+    print("WARN: API_KEY admin override env var not set")
 
 
 SWAGGER_URL = "/doc"
@@ -60,11 +49,12 @@ def openapiSpec():
 
 @app.route("/maps/",methods = ['GET', 'POST', 'PUT'])
 def mapsRoute():
-	if request.method in ('PUT', 'POST'):
-		unauthorized = _require_api_key()
-		if unauthorized is not None:
-			return unauthorized
 	payload = request.get_json(silent=True)
+	if request.method in ('PUT', 'POST'):
+		unauthorized = verify_map_request(request.method, payload, request.headers.get)
+		if unauthorized is not None:
+			body, status = unauthorized
+			return jsonify(body), status
 	return maps(payload,request)
 
 @app.route("/search/",methods = ['POST'])
