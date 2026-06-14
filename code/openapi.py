@@ -31,13 +31,15 @@ OPENAPI_SPEC = {
         "/maps/": {
             "get": {
                 "tags": ["maps"],
-                "summary": "List all maps",
-                "description": "Unauthenticated.",
+                "summary": "List maps",
+                "description": "Visibility-filtered listing. Without a token, returns only rows where `access='public'`. With a valid `Authorization: Bearer <jwt>`, also returns rows whose `space_id` appears in the token's `groups` claim. Invalid or expired tokens return 401; missing tokens are treated as anonymous.",
+                "security": [{"BearerAuth": []}, {}],
                 "responses": {
                     "200": {
                         "description": "Array of map rows from PostGIS",
                         "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/Map"}}}},
-                    }
+                    },
+                    "401": {"description": "Bearer token provided but verification failed."},
                 },
             },
             "put": {
@@ -83,7 +85,8 @@ OPENAPI_SPEC = {
             "post": {
                 "tags": ["search"],
                 "summary": "Search maps",
-                "description": "Postgres ILIKE search on `name` and `tags`, optionally bounded by `created_at` range. Unauthenticated.",
+                "description": "Postgres ILIKE search on `name` and `tags`, optionally bounded by `created_at` range. Same visibility rules as `GET /maps/`: anonymous callers see only `access='public'` rows; a valid `Authorization: Bearer <jwt>` additionally unlocks rows whose `space_id` is in the token's `groups` claim.",
+                "security": [{"BearerAuth": []}, {}],
                 "requestBody": {
                     "required": True,
                     "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SearchQuery"}}},
@@ -92,7 +95,8 @@ OPENAPI_SPEC = {
                     "200": {
                         "description": "Matching map rows",
                         "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/Map"}}}},
-                    }
+                    },
+                    "401": {"description": "Bearer token provided but verification failed."},
                 },
             }
         },
@@ -151,7 +155,13 @@ OPENAPI_SPEC = {
                 "in": "header",
                 "name": "X-Api-Key",
                 "description": "Per-space API key from `space.key`. On PUT, must match the key of the space named in the request body. On POST, must match the key of the space that owns the target `mapid`. The server's `API_KEY` env var, when set, is accepted as an admin override.",
-            }
+            },
+            "BearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "JWT",
+                "description": "JWT verified via JWKS (RS256/ES256). Payload must contain a top-level `groups: [<space-uuid>, ...]` array. Used on read endpoints (`GET /maps/`, `POST /search/`) to unlock private rows whose `space_id` is in `groups`. Without a token, only `access='public'` rows are returned.",
+            },
         },
         "schemas": {
             "MapCreate": {

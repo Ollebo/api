@@ -2,6 +2,7 @@
 import json
 from maps import maps
 from auth import verify_map_request
+from jwt_auth import get_auth_context, JwtError
 
 
 print("run lamda maps")
@@ -50,7 +51,18 @@ def handler(event, context):
                 "headers": CORS_HEADERS,
             }
 
-    returnFromFunction = maps(payload, request)
+    groups = None
+    if method == "GET":
+        try:
+            groups = get_auth_context(_headers_get(event))
+        except JwtError as e:
+            return {
+                "statusCode": 401,
+                "body": json.dumps({"error": "unauthorized", "detail": str(e)}),
+                "headers": CORS_HEADERS,
+            }
+
+    returnFromFunction = maps(payload, request, groups=groups)
     return {
         "statusCode": 200,
         "body": returnFromFunction,

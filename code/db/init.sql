@@ -42,6 +42,23 @@ CREATE TABLE IF NOT EXISTS maps (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Demo rows so anonymous vs JWT'd GET/search can be exercised end-to-end.
+INSERT INTO maps (creator_id, space_id, asset_id, name, tags, status, access, mapid, location)
+VALUES
+ ('00000000-0000-0000-0000-000000000001',
+  '11111111-1111-1111-1111-111111111111',
+  '00000000-0000-0000-0000-000000000000',
+  'public-demo', ARRAY['demo','public'], 'ready', 'public',
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+  ST_SetSRID(ST_MakePoint(18.0686, 59.3293), 4326)::geography),
+ ('00000000-0000-0000-0000-000000000001',
+  '22222222-2222-2222-2222-222222222222',
+  '00000000-0000-0000-0000-000000000000',
+  'private-demo', ARRAY['demo','private'], 'ready', 'private',
+  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+  ST_SetSRID(ST_MakePoint(18.0686, 59.3293), 4326)::geography)
+ON CONFLICT DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS missions (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name        VARCHAR(250),

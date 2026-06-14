@@ -20,6 +20,7 @@ from openapi import OPENAPI_SPEC
 from sse_bridge import start_bridge, subscribe
 from db.postgis import getRecentEvents, conn as pg_conn
 from auth import verify_map_request
+from jwt_auth import get_auth_context, JwtError
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -47,6 +48,11 @@ def openapiSpec():
     return jsonify(OPENAPI_SPEC)
 
 
+def _log_jwt_failure(route, reason):
+	fwd = request.headers.get("X-Forwarded-For") or request.headers.get("X-Real-Ip") or "?"
+	print("ERROR {} unauthorized: reason={} ip={}".format(route, reason, fwd))
+
+
 @app.route("/maps/",methods = ['GET', 'POST', 'PUT'])
 def mapsRoute():
 	payload = request.get_json(silent=True)
@@ -55,12 +61,23 @@ def mapsRoute():
 		if unauthorized is not None:
 			body, status = unauthorized
 			return jsonify(body), status
-	return maps(payload,request)
+		return maps(payload, request)
+	try:
+		groups = get_auth_context(request.headers.get)
+	except JwtError as e:
+		_log_jwt_failure("GET /maps/", str(e))
+		return jsonify({"error": "unauthorized", "detail": str(e)}), 401
+	return maps(payload, request, groups=groups)
 
 @app.route("/search/",methods = ['POST'])
 def searchRoute():
 	payload = request.get_json(silent=True)
-	return mapsSearch(payload)
+	try:
+		groups = get_auth_context(request.headers.get)
+	except JwtError as e:
+		_log_jwt_failure("POST /search/", str(e))
+		return jsonify({"error": "unauthorized", "detail": str(e)}), 401
+	return mapsSearch(payload, groups=groups)
 
 
 @app.route("/missions/",methods = ['GET', 'POST', 'PUT'])

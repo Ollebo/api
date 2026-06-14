@@ -52,15 +52,15 @@ def _validate_post(payload):
     return further
 
 
-def mapsSearch(payload):
+def mapsSearch(payload, groups=None):
     print(payload)
     if payload is None:
         return '{"error":"Missing search"}'
-    return searchMaps(payload)
+    return searchMaps(payload, groups=groups)
 
 
 
-def maps(payload,request):
+def maps(payload, request, groups=None):
     print(request.method)
 
     if request.method   == "POST":
@@ -81,19 +81,8 @@ def maps(payload,request):
             print("ERROR POST /maps/ db error: mapid={} err={}".format(payload.get("mapid"), e))
             return jsonify({"error": "db error", "detail": str(e)}), 500
     if request.method == "GET":
-        print("Search for maps")
-        lon = 1
-        lat = 2
-        returnType = "none"
-        print(lon)
-        print(lat)
-        if lon == 1 and lat == 2:
-            return getDataDb("maps")
-        else:
-            if returnType == "points":
-                return getDataDbMapsPoints(lon,lat)
-            else:
-                return getDataDbMaps(lon,lat)
+        print("List maps (groups={})".format(groups))
+        return getDataDb("maps", groups=groups)
     if request.method == "PUT":
         print("Add to database")
         if payload is None:

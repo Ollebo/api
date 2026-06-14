@@ -140,57 +140,32 @@ def updateMapDataDb(jsonData, db="maps"):
 
 
 
-def getDataDb(db="maps"):
-    # Add data to the database
-    # Connect to the database
+def _visibility_clause(groups):
+    if not groups:
+        return ("access = %s", ['public'])
+    return ("(access = %s OR space_id = ANY(%s::uuid[]))", ['public', list(groups)])
+
+
+def getDataDb(db="maps", groups=None):
     print("Getting data from db all")
-    postgreSQL_select_Query = "select *, ST_AsGeoJSON(location),TO_CHAR(created_at, 'YYYY-MM-DD') AS created_at, TO_CHAR(updated_at, 'YYYY-MM-DD') AS updated_at from maps"
+    vis_sql, vis_params = _visibility_clause(groups)
+    query = (
+        "SELECT *, ST_AsGeoJSON(location), "
+        "TO_CHAR(created_at, 'YYYY-MM-DD') AS created_at, "
+        "TO_CHAR(updated_at, 'YYYY-MM-DD') AS updated_at "
+        "FROM maps WHERE " + vis_sql
+    )
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute(postgreSQL_select_Query)
-    maps = cur.fetchall()
-    print(maps)
-    return maps
-
-#get values based on lon and lat
-def getDataDbMaps(lon,lat):
-    print("Getting close data from db ")
-    print(lon,lat)
-    postgreSQL_select_Query = "select * from maps where location <-> ST_MakePoint("+str(lon)+","+str(lat)+") > 1000"
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute(postgreSQL_select_Query)
-    maps = cur.fetchall()
-    #maps = json.dumps(cur.fetchall(), indent=2)
-
-
-    return maps
-
-#get values based on lon and lat
-def getDataDbMapsPoints(lon,lat):
-    print("Getting close and make geo pints from db")
-    print(lon,lat)
-
-    #Get data from database
-    postgreSQL_select_Query = "select name, tags,  mapid, ST_AsGeojson(location) AS geometry  from maps where location <-> ST_MakePoint("+str(lon)+","+str(lat)+") > 1000"
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute(postgreSQL_select_Query)
-    maps = json.loads(json.dumps(cur.fetchall(), indent=2))
-    #print(maps)
-
-
-    # make geopints
-    geoJson = {"type": "FeatureCollection","features": []}
-    for i in maps:
-        GeoFeture = {
-            "type": "Feature",
-            "geometry": json.loads(i['geometry']),
-            "title": i['name'],
-            "tags": i['tags'],
-            "mapid" : i['mapid'],
-
-        }
-
-        geoJson["features"].append(GeoFeture)
-    return geoJson
+    try:
+        cur.execute(query, vis_params)
+        return cur.fetchall()
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        print("getDataDb failed: {}".format(e))
+        return {"error": str(e)}
 
 ####
 ## Missions
@@ -354,15 +329,16 @@ def getRecentEvents(mission_id, minutes=15):
 ####
 ## Search (replaces Meilisearch)
 ####
-def searchMaps(payload):
+def searchMaps(payload, groups=None):
     print("Searching maps in postgis")
     name = payload.get("name")
     tags = payload.get("tags")
     fromdate = payload.get("fromdate")
     todate = payload.get("todate")
 
-    clauses = []
-    params = []
+    vis_sql, vis_params = _visibility_clause(groups)
+    clauses = [vis_sql]
+    params = list(vis_params)
 
     if name:
         clauses.append("name ILIKE %s")
@@ -377,7 +353,7 @@ def searchMaps(payload):
         clauses.append("created_at <= %s")
         params.append(todate)
 
-    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    where = " WHERE " + " AND ".join(clauses)
     query = (
         "SELECT *, ST_AsGeoJSON(location) AS geometry, "
         "TO_CHAR(created_at, 'YYYY-MM-DD') AS created_at, "
