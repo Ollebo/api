@@ -202,6 +202,38 @@ def missionExists(mission_id):
         return False
 
 
+def missionExistsByKey(key):
+    # Mission clients authenticate with the mission key; accept the id too so callers
+    # passing an id still validate.
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM missions WHERE key = %s OR id = %s LIMIT 1",
+                    (str(key), str(key)))
+        return cur.fetchone() is not None
+    except Exception as e:
+        print("missionExistsByKey failed: {}".format(e))
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return False
+
+
+def getMissionByKey(key):
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("SELECT id, name, space_id FROM missions WHERE key = %s OR id = %s LIMIT 1",
+                    (str(key), str(key)))
+        return cur.fetchone()
+    except Exception as e:
+        print("getMissionByKey failed: {}".format(e))
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return None
+
+
 def getSpaceKey(space_id):
     try:
         cur = conn.cursor()

@@ -15,7 +15,7 @@ from flask_swagger_ui import get_swaggerui_blueprint
 from prometheus_flask_exporter import PrometheusMetrics
 from maps import maps, mapsSearch
 from event import event, recent
-from missions import missions, mission
+from missions import missions, mission, missionValidate
 from openapi import OPENAPI_SPEC
 from sse_bridge import start_bridge, subscribe
 from db.postgis import getRecentEvents, conn as pg_conn
@@ -89,6 +89,10 @@ def missionsRoute():
 def missionRoute(id):
 	payload = request.get_json(silent=True)
 	return mission(id,request)
+
+@app.route("/mission/validate/<key>",methods = ['GET'])
+def missionValidateRoute(key):
+	return missionValidate(key, request)
 
 
 

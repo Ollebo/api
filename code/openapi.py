@@ -127,6 +127,25 @@ OPENAPI_SPEC = {
                 },
             },
         },
+        "/mission/validate/{key}": {
+            "parameters": [
+                {"name": "key", "in": "path", "required": True, "schema": {"type": "string", "format": "uuid"}}
+            ],
+            "get": {
+                "tags": ["missions"],
+                "summary": "Validate a mission key",
+                "responses": {
+                    "200": {
+                        "description": "Key is valid; returns mission_id and name",
+                        "content": {"application/json": {"schema": {"type": "object"}}},
+                    },
+                    "404": {
+                        "description": "Key is not valid",
+                        "content": {"application/json": {"schema": {"type": "object"}}},
+                    },
+                },
+            },
+        },
         "/event/{mission_id}": {
             "parameters": [
                 {"name": "mission_id", "in": "path", "required": True, "schema": {"type": "string", "format": "uuid"}}
