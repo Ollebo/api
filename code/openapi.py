@@ -305,10 +305,17 @@ OPENAPI_SPEC = {
             },
             "Event": {
                 "type": "object",
+                "description": (
+                    "A single mission telemetry sample (e.g. one drone reading). Mapped "
+                    "columns are stored in the `mission_data` hypertable and replayed in "
+                    "`backfill`/`recent`; the FULL body is echoed back verbatim as the "
+                    "`payload` of every `live` SSE frame, so custom keys inside `jsonData` "
+                    "(and any extra top-level keys) round-trip to live subscribers."
+                ),
                 "required": ["type"],
                 "properties": {
-                    "type": {"type": "string", "example": "telemetry"},
-                    "temp": {"type": "number"},
+                    "type": {"type": "string", "example": "telemetry", "description": "Reading/category label."},
+                    "temp": {"type": "number", "description": "Temperature; stored as `temperature`."},
                     "humidity": {"type": "number"},
                     "geopoint": {
                         "type": "array",
@@ -316,15 +323,16 @@ OPENAPI_SPEC = {
                         "minItems": 2,
                         "maxItems": 2,
                         "example": [18.0686, 59.3293],
+                        "description": "[longitude, latitude] (PostGIS order). Stored as a geography POINT.",
                     },
-                    "img": {"type": "string"},
+                    "img": {"type": "string", "description": "Image URL/reference for this sample."},
                     "x": {"type": "number"},
                     "y": {"type": "number"},
-                    "z": {"type": "number"},
-                    "data": {"type": "number"},
-                    "jsonData": {"type": "object"},
-                    "device": {"type": "string"},
-                    "deviceJson": {"type": "object"},
+                    "z": {"type": "number", "description": "Free numeric axis; commonly altitude."},
+                    "data": {"type": "number", "description": "Generic numeric measurement."},
+                    "jsonData": {"type": "object", "description": "Arbitrary structured payload; persisted to the `jsondata` column and returned in backfill/recent/live."},
+                    "device": {"type": "string", "example": "drone-01"},
+                    "deviceJson": {"type": "object", "description": "Arbitrary device metadata; persisted to `devicejson`."},
                 },
             },
             "WriteResult": {
