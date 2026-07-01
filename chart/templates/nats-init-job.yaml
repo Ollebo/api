@@ -1,0 +1,49 @@
+{{- if .Values.natsInit.enabled }}
+# One-shot Job that ensures the JetStream streams exist and are bound to the
+# right subjects (events -> "events.>", maps -> "maps"/"work") by running
+# code/db/initNats.py. Without the "events.>" binding the split per-mission
+# subjects (events.public.<id> / events.private.<space_id>.<id>) have no stream
+# and the SSE /event/<id>/stream route 500s.
+#
+# The name is suffixed with the image tag so every release renders a NEW Job
+# that runs once — this survives the repo's `helm template` -> GitOps apply flow
+# (plain Jobs are immutable and a same-named Job would never re-run). The Helm
+# hook annotations additionally trigger it on a native `helm upgrade`.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-nats-init-{{ .Values.image.tag | toString | trunc 24 | trimSuffix "-" }}
+  labels:
+    app: ollebo-api
+    component: nats-init
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  # Auto-clean finished Jobs (needs the TTL controller, GA since k8s 1.23).
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 10
+  template:
+    metadata:
+      labels:
+        app: ollebo-api
+        component: nats-init
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: nats-init
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["python", "db/initNats.py"]
+          env:
+            - name: NATS
+              value: nats://nats:4222
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+{{- end }}

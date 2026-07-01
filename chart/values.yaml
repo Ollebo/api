@@ -27,3 +27,9 @@ hpa:
   minReplicas: 2
   maxReplicas: 10
   targetCPU: 70
+
+# One-shot Job (chart/templates/nats-init-job.yaml) that runs code/db/initNats.py
+# to (re)bind the JetStream streams — notably events -> "events.>" for the split
+# public/private mission subjects. Runs once per release.
+natsInit:
+  enabled: true
