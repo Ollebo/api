@@ -155,6 +155,14 @@ def eventStreamRoute(mission_id):
 
 
 
+@app.route("/version", methods=["GET"])
+@metrics.do_not_track()
+def version():
+	# APP_VERSION is baked into the image at build time from the commit SHA
+	# (see Dockerfile / CI). "dev" for local/unstamped builds.
+	return jsonify({"name": "ollebo-api", "version": os.environ.get("APP_VERSION", "dev")}), 200
+
+
 @app.route("/healthz", methods=["GET"])
 @metrics.do_not_track()
 def healthz():

@@ -16,6 +16,19 @@ OPENAPI_SPEC = {
         {"name": "meta", "description": "Service health / liveness"},
     ],
     "paths": {
+        "/version": {
+            "get": {
+                "tags": ["meta"],
+                "summary": "Build version",
+                "description": "Returns the running build's version (the commit SHA baked into the image at build time; `dev` for local builds).",
+                "responses": {
+                    "200": {
+                        "description": "Version info",
+                        "content": {"application/json": {"schema": {"type": "object", "properties": {"name": {"type": "string"}, "version": {"type": "string"}}}}},
+                    }
+                },
+            },
+        },
         "/": {
             "get": {
                 "tags": ["meta"],

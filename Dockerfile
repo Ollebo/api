@@ -1,4 +1,10 @@
 FROM python:3.9
+
+# Build stamp: CI passes the commit SHA (--build-arg GIT_SHA=$GITHUB_SHA); the
+# app surfaces it at GET /version. Defaults to "dev" for local builds.
+ARG GIT_SHA=dev
+ENV APP_VERSION=$GIT_SHA
+
 #Making folder for code
 RUN mkdir /code
 RUN mkdir /files
