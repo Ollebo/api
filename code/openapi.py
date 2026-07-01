@@ -153,7 +153,7 @@ OPENAPI_SPEC = {
             "put": {
                 "tags": ["events"],
                 "summary": "Append a mission event",
-                "description": "Persists a row into the `mission_data` hypertable and publishes to NATS subject `events`.",
+                "description": "Persists a row into the `mission_data` hypertable (keyed by the mission's canonical id) and publishes to NATS. Public missions publish to `events.public.<id>`; private missions to `events.private.<space_id>.<id>`. `mission_id` may be the mission key or its id.",
                 "requestBody": {
                     "required": True,
                     "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Event"}}},
@@ -162,7 +162,43 @@ OPENAPI_SPEC = {
                     "200": {
                         "description": "Insert result",
                         "content": {"application/json": {"schema": {"$ref": "#/components/schemas/WriteResult"}}},
-                    }
+                    },
+                    "404": {"description": "Mission not found"},
+                },
+            },
+        },
+        "/event/{mission_id}/recent": {
+            "parameters": [
+                {"name": "mission_id", "in": "path", "required": True, "schema": {"type": "string"}, "description": "Mission key or id"},
+                {"name": "minutes", "in": "query", "required": False, "schema": {"type": "integer", "default": 15, "minimum": 1, "maximum": 60}},
+            ],
+            "get": {
+                "tags": ["events"],
+                "summary": "Recent mission events",
+                "description": "Returns recent `mission_data` rows. Public missions are open; a private mission requires a Bearer JWT whose `groups` contains the mission's `space_id`.",
+                "security": [{"BearerAuth": []}, {}],
+                "responses": {
+                    "200": {"description": "Recent events", "content": {"application/json": {"schema": {"type": "array", "items": {"type": "object"}}}}},
+                    "401": {"description": "Malformed/invalid token"},
+                    "403": {"description": "Token lacks the mission's space_id (or private mission, no token)"},
+                    "404": {"description": "Mission not found"},
+                },
+            },
+        },
+        "/event/{mission_id}/stream": {
+            "parameters": [
+                {"name": "mission_id", "in": "path", "required": True, "schema": {"type": "string"}, "description": "Mission key or id"},
+            ],
+            "get": {
+                "tags": ["events"],
+                "summary": "Live mission event stream (SSE)",
+                "description": "Server-Sent Events stream: `backfill` frames (last 15 min from Postgres), then `ready`, then `live` frames tailed from NATS. Public missions are open; a private mission requires a Bearer JWT whose `groups` contains the mission's `space_id`.",
+                "security": [{"BearerAuth": []}, {}],
+                "responses": {
+                    "200": {"description": "text/event-stream", "content": {"text/event-stream": {"schema": {"type": "string"}}}},
+                    "401": {"description": "Malformed/invalid token"},
+                    "403": {"description": "Token lacks the mission's space_id (or private mission, no token)"},
+                    "404": {"description": "Mission not found"},
                 },
             },
         },
@@ -179,7 +215,7 @@ OPENAPI_SPEC = {
                 "type": "http",
                 "scheme": "bearer",
                 "bearerFormat": "JWT",
-                "description": "JWT verified via JWKS (RS256/ES256). Payload must contain a top-level `groups: [<space-uuid>, ...]` array. Used on read endpoints (`GET /maps/`, `POST /search/`) to unlock private rows whose `space_id` is in `groups`. Without a token, only `access='public'` rows are returned.",
+                "description": "JWT verified via JWKS (RS256/ES256). Payload must contain a top-level `groups: [<space-uuid>, ...]` array. Used on read endpoints (`GET /maps/`, `POST /search/`, and private-mission event reads `GET /event/{id}/recent` and `/stream`) to unlock rows/streams whose `space_id` is in `groups`. Without a token, only public maps/missions are returned.",
             },
         },
         "schemas": {

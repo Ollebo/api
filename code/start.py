@@ -14,7 +14,7 @@ from flask_cors import CORS
 from flask_swagger_ui import get_swaggerui_blueprint
 from prometheus_flask_exporter import PrometheusMetrics
 from maps import maps, mapsSearch
-from event import event, recent
+from event import event, recent, authorize_mission_read
 from missions import missions, mission, missionValidate
 from openapi import OPENAPI_SPEC
 from sse_bridge import start_bridge, subscribe
@@ -104,20 +104,34 @@ def eventsRoute(mission_id):
 
 @app.route("/event/<mission_id>/recent", methods=['GET'])
 def eventRecentRoute(mission_id):
+	mission, _subject, denied = authorize_mission_read(mission_id, request.headers.get)
+	if denied is not None:
+		body, status = denied
+		if status in (401, 403):
+			_log_jwt_failure("GET /event/{}/recent".format(mission_id), body.get("detail", body.get("error")))
+		return jsonify(body), status
 	try:
 		minutes = int(request.args.get("minutes", 15))
 	except (TypeError, ValueError):
 		minutes = 15
-	return recent(mission_id, minutes)
+	return recent(mission["id"], minutes)
 
 
 @app.route("/event/<mission_id>/stream", methods=['GET'])
 def eventStreamRoute(mission_id):
-	q, cancel = subscribe(mission_id)
+	mission, subject, denied = authorize_mission_read(mission_id, request.headers.get)
+	if denied is not None:
+		body, status = denied
+		if status in (401, 403):
+			_log_jwt_failure("GET /event/{}/stream".format(mission_id), body.get("detail", body.get("error")))
+		return jsonify(body), status
+
+	canonical_id = mission["id"]
+	q, cancel = subscribe(subject)
 
 	def gen():
 		try:
-			for row in getRecentEvents(mission_id, 15):
+			for row in getRecentEvents(canonical_id, 15):
 				yield "event: backfill\ndata: " + json.dumps(row, default=str) + "\n\n"
 			yield "event: ready\ndata: {}\n\n"
 			while True:

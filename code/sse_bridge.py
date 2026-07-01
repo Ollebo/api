@@ -65,8 +65,12 @@ def start_bridge():
         _started = True
 
 
-def subscribe(mission_id):
-    """Subscribe to live events for a single mission.
+def subscribe(subject):
+    """Subscribe to live events on a single NATS subject.
+
+    `subject` scopes the stream server-side (e.g. events.public.<id> or
+    events.private.<space_id>.<id>), so no client-side filtering is needed —
+    authorization for the subject is decided by the caller before subscribing.
 
     Returns (queue.Queue, cancel_fn). Items pushed to the queue are dicts of
     shape {"timestamp": str, "payload": dict}. cancel_fn unsubscribes; safe to
@@ -81,14 +85,13 @@ def subscribe(mission_id):
         try:
             wrapper = json.loads(msg.data.decode("utf-8"))
             inner = wrapper.get("data", {}) or {}
-            if inner.get("mission_id") == mission_id:
-                try:
-                    q.put_nowait({
-                        "timestamp": wrapper.get("timestamp"),
-                        "payload": inner.get("payload"),
-                    })
-                except queue.Full:
-                    print("sse_bridge: queue full for mission {}, dropping".format(mission_id))
+            try:
+                q.put_nowait({
+                    "timestamp": wrapper.get("timestamp"),
+                    "payload": inner.get("payload"),
+                })
+            except queue.Full:
+                print("sse_bridge: queue full for subject {}, dropping".format(subject))
         except Exception as e:
             print("sse_bridge: callback failed: {}".format(e))
         finally:
@@ -98,7 +101,7 @@ def subscribe(mission_id):
                 pass
 
     fut = asyncio.run_coroutine_threadsafe(
-        _js.subscribe("events", cb=cb),
+        _js.subscribe(subject, cb=cb),
         _loop,
     )
     sub = fut.result(timeout=5)

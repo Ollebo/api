@@ -11,10 +11,13 @@ async def main():
     nc = await nats.connect(os.getenv('NATS'))
     js = nc.jetstream()
 
+    # `events.>` captures the split subjects: events.public.<id> and
+    # events.private.<space_id>.<id>. Must stay a wildcard or publishes/reads
+    # on the per-mission subjects have no bound stream and silently fail.
     try:
         await js.add_stream(
             name="events",
-            subjects=["events"],
+            subjects=["events.>"],
             max_age=EVENTS_MAX_AGE_SECONDS,
         )
     except Exception as e:
@@ -23,7 +26,7 @@ async def main():
     try:
         await js.update_stream(
             name="events",
-            subjects=["events"],
+            subjects=["events.>"],
             max_age=EVENTS_MAX_AGE_SECONDS,
         )
     except Exception as e:

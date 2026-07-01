@@ -1,9 +1,14 @@
+import json
 import os
 import redis
 
 _VALID_TTL = 3600
 _INVALID_TTL = 600
 _KEY_PREFIX = "mission_valid:"
+
+_MISSION_PREFIX = "mission_meta:"
+_MISSION_TTL = 3600
+_MISSION_MISS_TTL = 600
 
 _SPACE_KEY_PREFIX = "space_key:"
 _SPACE_KEY_TTL = 300
@@ -42,6 +47,40 @@ def setMissionValidity(mission_id, valid):
     try:
         ttl = _VALID_TTL if valid else _INVALID_TTL
         client.set(_KEY_PREFIX + str(mission_id), "1" if valid else "0", ex=ttl)
+    except Exception as e:
+        print("Redis SET failed: {}".format(e))
+
+
+# Resolved-mission cache. Stores the visibility-relevant fields
+# ({id, space_id, is_private}) as JSON so ingest and read-auth don't re-query
+# Postgres per event/stream. Empty string is a cached-miss sentinel (mission
+# absent) so unknown ids don't hammer the DB.
+def getCachedMission(key):
+    """Return the cached mission dict, "" for a cached miss, or None if unknown."""
+    if client is None:
+        return None
+    try:
+        v = client.get(_MISSION_PREFIX + str(key))
+    except Exception as e:
+        print("Redis GET failed: {}".format(e))
+        return None
+    if v is None:
+        return None
+    if v == "":
+        return ""
+    try:
+        return json.loads(v)
+    except ValueError:
+        return None
+
+
+def setCachedMission(key, mission):
+    if client is None:
+        return
+    try:
+        ttl = _MISSION_TTL if mission else _MISSION_MISS_TTL
+        payload = json.dumps(mission, default=str) if mission else ""
+        client.set(_MISSION_PREFIX + str(key), payload, ex=ttl)
     except Exception as e:
         print("Redis SET failed: {}".format(e))
 

@@ -220,10 +220,15 @@ def missionExistsByKey(key):
 
 
 def getMissionByKey(key):
+    # Resolves a mission from either its key or its id. `is_private` drives read
+    # visibility (public missions stream without auth; private ones require a JWT
+    # whose groups contain space_id). Feeds both ingest and read authorization.
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute("SELECT id, name, space_id FROM missions WHERE key = %s OR id = %s LIMIT 1",
-                    (str(key), str(key)))
+        cur.execute(
+            "SELECT id, name, space_id, is_private FROM missions "
+            "WHERE key = %s OR id = %s LIMIT 1",
+            (str(key), str(key)))
         return cur.fetchone()
     except Exception as e:
         print("getMissionByKey failed: {}".format(e))
