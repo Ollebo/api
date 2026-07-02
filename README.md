@@ -241,6 +241,26 @@ curl -N https://api.ollebo.com/event/<private-key>/stream \
   -H "Authorization: Bearer $JWT"      # JWT.groups must contain the mission space_id
 ```
 
+## Dummy traffic simulator
+
+`code/simulator.py` pushes realistic dummy telemetry so the GUI has live data to
+render. It drives several moving assets of different types (**drone / boat /
+rover**) at different locations plus a fixed **temperature** sensor, all into the
+public mission. It runs as a pod beside the API (`chart/templates/simulator.yaml`,
+gated by `simulator.enabled`, on by default) and can also be run locally:
+
+```bash
+API_BASE=https://api.ollebo.com \
+MISSION_KEY=6f737b8c-f2ff-4e67-b7ee-abf29a2d7373 \
+python3 code/simulator.py
+# knobs (env): INTERVAL_SECONDS, DRONES, BOATS, ROVERS, TEMP_SENSORS, TEMP_EVERY, MAX_TICKS
+```
+
+Each asset emits the `Event` shape above with `jsonData.{assetType,name,model,
+altitude,heading,speed,battery,visibility}` so the ollebo-maps consumer renders
+it directly. **Turn it off in prod once real data flows:** set
+`simulator.enabled: false` in `chart/values.yaml` and redeploy.
+
 ## Version / which build is live
 
 ```bash

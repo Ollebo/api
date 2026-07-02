@@ -33,3 +33,15 @@ hpa:
 # public/private mission subjects. Runs once per release.
 natsInit:
   enabled: true
+
+# Dummy-traffic simulator (chart/templates/simulator.yaml) that pushes
+# drone/boat/rover telemetry + temperature events into the public mission so the
+# GUI has live data. Set enabled: false once real data flows.
+simulator:
+  enabled: true
+  missionKey: "6f737b8c-f2ff-4e67-b7ee-abf29a2d7373"
+  intervalSeconds: 2
+  drones: 2
+  boats: 1
+  rovers: 1
+  tempSensors: 1

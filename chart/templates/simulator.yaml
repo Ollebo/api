@@ -1,0 +1,53 @@
+{{- if .Values.simulator.enabled }}
+# Dummy-traffic simulator that runs code/simulator.py (baked into the api image)
+# and pushes drone/boat/rover telemetry + temperature events to the public
+# mission so the GUI has live data to render. Reuses the api image with a
+# command override — no separate build. Disable with simulator.enabled=false.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-simulator
+  labels:
+    app: ollebo-simulator
+    component: simulator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ollebo-simulator
+  template:
+    metadata:
+      labels:
+        # Deliberately NOT app: ollebo-api, so this pod is not folded into the
+        # API Service's endpoints.
+        app: ollebo-simulator
+        component: simulator
+    spec:
+      containers:
+        - name: simulator
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["python", "simulator.py"]
+          env:
+            - name: API_BASE
+              value: http://{{ .Release.Name }}:8080
+            - name: MISSION_KEY
+              value: {{ .Values.simulator.missionKey | quote }}
+            - name: INTERVAL_SECONDS
+              value: {{ .Values.simulator.intervalSeconds | quote }}
+            - name: DRONES
+              value: {{ .Values.simulator.drones | quote }}
+            - name: BOATS
+              value: {{ .Values.simulator.boats | quote }}
+            - name: ROVERS
+              value: {{ .Values.simulator.rovers | quote }}
+            - name: TEMP_SENSORS
+              value: {{ .Values.simulator.tempSensors | quote }}
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+{{- end }}
