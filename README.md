@@ -241,6 +241,20 @@ curl -N https://api.ollebo.com/event/<private-key>/stream \
   -H "Authorization: Bearer $JWT"      # JWT.groups must contain the mission space_id
 ```
 
+### All public missions in one stream (firehose)
+
+`GET /event/public/stream` is a single SSE feed of **every** public mission (no
+auth). It's **live-only** (no backfill); each `live` frame's data includes
+`mission_id` so you know which mission each event came from:
+
+```js
+new EventSource("https://api.ollebo.com/event/public/stream")
+  .addEventListener("live", e => {
+    const { mission_id, timestamp, payload } = JSON.parse(e.data);
+    // payload.device, payload.geopoint, payload.jsonData.{assetType,altitude,…}
+  });
+```
+
 ## Dummy traffic simulator
 
 `code/simulator.py` pushes realistic dummy telemetry so the GUI has live data to

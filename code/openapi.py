@@ -215,6 +215,16 @@ OPENAPI_SPEC = {
                 },
             },
         },
+        "/event/public/stream": {
+            "get": {
+                "tags": ["events"],
+                "summary": "Live stream of ALL public missions (SSE)",
+                "description": "Server-Sent Events firehose of every public mission (NATS `events.public.>`). No auth. Live-only (no backfill): `ready` then `live` frames. Each `live` frame's data is `{\"timestamp\", \"mission_id\", \"payload\"}` so consumers can tell which mission each event belongs to.",
+                "responses": {
+                    "200": {"description": "text/event-stream", "content": {"text/event-stream": {"schema": {"type": "string"}}}},
+                },
+            },
+        },
     },
     "components": {
         "securitySchemes": {

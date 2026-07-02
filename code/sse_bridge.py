@@ -88,6 +88,7 @@ def subscribe(subject):
             try:
                 q.put_nowait({
                     "timestamp": wrapper.get("timestamp"),
+                    "mission_id": inner.get("mission_id"),
                     "payload": inner.get("payload"),
                 })
             except queue.Full:

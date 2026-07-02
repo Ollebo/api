@@ -117,6 +117,37 @@ def eventRecentRoute(mission_id):
 	return recent(mission["id"], minutes)
 
 
+@app.route("/event/public/stream", methods=['GET'])
+def eventPublicStreamRoute():
+	# Firehose of ALL public missions (NATS subject events.public.>). No auth —
+	# public by definition. Live-only (no cross-mission backfill); each `live`
+	# frame carries mission_id so consumers know which mission it came from.
+	# Static path is ranked above the dynamic /event/<mission_id>/stream rule.
+	q, cancel = subscribe("events.public.>")
+
+	def gen():
+		try:
+			yield "event: ready\ndata: {}\n\n"
+			while True:
+				try:
+					item = q.get(timeout=15)
+					yield "event: live\ndata: " + json.dumps(item, default=str) + "\n\n"
+				except queue.Empty:
+					yield ": ping\n\n"
+		finally:
+			cancel()
+
+	return Response(
+		stream_with_context(gen()),
+		mimetype="text/event-stream",
+		headers={
+			"Cache-Control": "no-cache",
+			"X-Accel-Buffering": "no",
+			"Connection": "keep-alive",
+		},
+	)
+
+
 @app.route("/event/<mission_id>/stream", methods=['GET'])
 def eventStreamRoute(mission_id):
 	mission, subject, denied = authorize_mission_read(mission_id, request.headers.get)
