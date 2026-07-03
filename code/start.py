@@ -23,7 +23,16 @@ from auth import verify_map_request
 from jwt_auth import get_auth_context, JwtError
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
+# The dashboard opens the SSE stream with EventSource {withCredentials: true},
+# so responses must carry Access-Control-Allow-Credentials: true — which in turn
+# forbids a wildcard Access-Control-Allow-Origin. Allowlist specific origins
+# (override via CORS_ORIGINS, comma-separated) and enable credentials.
+_default_cors = (
+    "https://dash.ollebo.com,https://ollebo.com,https://www.ollebo.com,"
+    "http://localhost:5173,http://localhost:3000,http://localhost:8888"
+)
+_cors_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", _default_cors).split(",") if o.strip()]
+CORS(app, resources={r"/*": {"origins": _cors_origins}}, supports_credentials=True)
 metrics = PrometheusMetrics(app, path="/metrics")
 
 start_bridge()
