@@ -10,8 +10,12 @@ _KEY_PREFIX = "mission_valid:"
 # bumping the prefix drops stale entries from the prior build instead of reading
 # them back (missing is_public -> wrongly treated as non-public) until TTL expiry.
 _MISSION_PREFIX = "mission_meta_v2:"
-_MISSION_TTL = 3600
-_MISSION_MISS_TTL = 600
+# Short TTLs: `is_public` (and space_id) live in the DB and can change out from
+# under us (e.g. a dw-side mission re-provision). Keep the cache brief so a
+# visibility flip propagates in ~2 min instead of lingering for an hour, at the
+# cost of an occasional cheap indexed re-read.
+_MISSION_TTL = 120
+_MISSION_MISS_TTL = 60
 
 _SPACE_KEY_PREFIX = "space_key:"
 _SPACE_KEY_TTL = 300
