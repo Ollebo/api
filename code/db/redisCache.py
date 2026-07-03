@@ -6,7 +6,10 @@ _VALID_TTL = 3600
 _INVALID_TTL = 600
 _KEY_PREFIX = "mission_valid:"
 
-_MISSION_PREFIX = "mission_meta:"
+# v2 prefix: the cached record shape changed from {…,is_private} to {…,is_public};
+# bumping the prefix drops stale entries from the prior build instead of reading
+# them back (missing is_public -> wrongly treated as non-public) until TTL expiry.
+_MISSION_PREFIX = "mission_meta_v2:"
 _MISSION_TTL = 3600
 _MISSION_MISS_TTL = 600
 
@@ -52,7 +55,7 @@ def setMissionValidity(mission_id, valid):
 
 
 # Resolved-mission cache. Stores the visibility-relevant fields
-# ({id, space_id, is_private}) as JSON so ingest and read-auth don't re-query
+# ({id, space_id, is_public}) as JSON so ingest and read-auth don't re-query
 # Postgres per event/stream. Empty string is a cached-miss sentinel (mission
 # absent) so unknown ids don't hammer the DB.
 def getCachedMission(key):

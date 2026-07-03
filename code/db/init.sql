@@ -59,8 +59,9 @@ VALUES
   ST_SetSRID(ST_MakePoint(18.0686, 59.3293), 4326)::geography)
 ON CONFLICT DO NOTHING;
 
--- `key` is the mission's write/lookup secret; `is_private` drives read
+-- `key` is the mission's write/lookup secret; `is_public` drives read
 -- visibility (mirrors the canonical `missions` table in ../dw/db/tables/asset.sql).
+-- `is_private` is kept for parity with dw but no longer read by the api.
 CREATE TABLE IF NOT EXISTS missions (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name        VARCHAR(250),
@@ -68,20 +69,21 @@ CREATE TABLE IF NOT EXISTS missions (
     space_id    UUID,
     key         UUID,
     is_private  BOOLEAN,
+    is_public   BOOLEAN NOT NULL DEFAULT FALSE,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- Demo missions so public (no auth) vs private (JWT group must contain space_id)
 -- event retrieval can be exercised end-to-end. Space ids match the maps demo rows.
-INSERT INTO missions (id, name, status, space_id, key, is_private)
+INSERT INTO missions (id, name, status, space_id, key, is_public)
 VALUES
  ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'public-mission', 'ready',
   '11111111-1111-1111-1111-111111111111',
-  'dddddddd-dddd-dddd-dddd-dddddddddddd', false),
+  'dddddddd-dddd-dddd-dddd-dddddddddddd', true),
  ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'private-mission', 'ready',
   '22222222-2222-2222-2222-222222222222',
-  'ffffffff-ffff-ffff-ffff-ffffffffffff', true)
+  'ffffffff-ffff-ffff-ffff-ffffffffffff', false)
 ON CONFLICT (id) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS mission_data (

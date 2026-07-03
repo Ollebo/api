@@ -74,7 +74,7 @@ def subject_for(mission):
 
 
 def resolve_mission(param):
-    """Resolve a key-or-id path param to {id, space_id, is_private}, Redis-cached."""
+    """Resolve a key-or-id path param to {id, space_id, is_public}, Redis-cached."""
     cached = getCachedMission(param)
     if cached == "":
         return None
@@ -90,13 +90,13 @@ def resolve_mission(param):
     mission = {
         "id": str(row["id"]),
         "space_id": str(space_id) if space_id is not None else None,
-        "is_private": row.get("is_private"),
+        "is_public": bool(row.get("is_public")),
     }
     setCachedMission(param, mission)
     return mission
 
 
 def _is_public(mission):
-    # Fail closed: a mission is public only when is_private is explicitly False.
-    # NULL/True (or missing) is treated as private.
-    return mission.get("is_private") is False
+    # is_public is the authoritative flag (NOT NULL DEFAULT FALSE in the schema):
+    # a mission is public iff is_public is true; otherwise it's space-private.
+    return bool(mission.get("is_public"))

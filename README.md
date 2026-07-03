@@ -170,13 +170,13 @@ PUT /event/<key>            GET /event/<key>/stream (SSE)
 
 ## Public vs private missions
 
-Read visibility is driven by the mission's `is_private` column (fail-closed:
-private unless explicitly `false`).
+Read visibility is driven by the mission's `is_public` column
+(`BOOLEAN NOT NULL DEFAULT FALSE` — a mission is public only when explicitly set).
 
 | Mission | `GET /recent` & `/stream` |
 |---|---|
-| **public** (`is_private = false`) | open, no auth |
-| **private** (`is_private = true`/null) | requires `Authorization: Bearer <jwt>` whose `groups` claim contains the mission's `space_id`; otherwise `403` (bad/expired token → `401`) |
+| **public** (`is_public = true`) | open, no auth |
+| **private** (`is_public = false`, the default) | requires `Authorization: Bearer <jwt>` whose `groups` claim contains the mission's `space_id`; otherwise `403` (bad/expired token → `401`) |
 
 This is the same JWT-`groups`-vs-`space_id` model used by the maps read
 endpoints (`GET /maps/`, `POST /search/`).
