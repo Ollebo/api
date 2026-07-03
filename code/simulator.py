@@ -17,7 +17,7 @@ persist to mission_data columns; custom fields ride in jsonData.
 
 Config (env, all optional):
     API_BASE          default http://api:8080
-    MISSION_KEY       default 6f737b8c-f2ff-4e67-b7ee-abf29a2d7373  (public mission v2)
+    MISSION_KEY       default a744e376-b35c-43ce-8c61-b82d8bb9f9d0  (demo public mission; key or id)
     INTERVAL_SECONDS  default 2      seconds between ticks
     DRONES/BOATS/ROVERS/TEMP_SENSORS  default 2/1/1/1
     TEMP_EVERY        default 5      emit temperature every N ticks
@@ -33,7 +33,7 @@ import urllib.error
 import urllib.request
 
 API_BASE = os.environ.get("API_BASE", "http://api:8080").rstrip("/")
-MISSION_KEY = os.environ.get("MISSION_KEY", "6f737b8c-f2ff-4e67-b7ee-abf29a2d7373")
+MISSION_KEY = os.environ.get("MISSION_KEY", "a744e376-b35c-43ce-8c61-b82d8bb9f9d0")
 INTERVAL = float(os.environ.get("INTERVAL_SECONDS", "2"))
 DRONES = int(os.environ.get("DRONES", "2"))
 BOATS = int(os.environ.get("BOATS", "1"))

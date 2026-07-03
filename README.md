@@ -273,7 +273,7 @@ gated by `simulator.enabled`, on by default) and can also be run locally:
 
 ```bash
 API_BASE=https://api.ollebo.com \
-MISSION_KEY=6f737b8c-f2ff-4e67-b7ee-abf29a2d7373 \
+MISSION_KEY=a744e376-b35c-43ce-8c61-b82d8bb9f9d0 \
 python3 code/simulator.py
 # knobs (env): INTERVAL_SECONDS, DRONES, BOATS, ROVERS, TEMP_SENSORS, TEMP_EVERY, MAX_TICKS
 ```
