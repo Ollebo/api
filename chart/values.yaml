@@ -28,6 +28,15 @@ hpa:
   maxReplicas: 10
   targetCPU: 70
 
+# Keycloak config for JWT verification on private-data reads (missions/maps).
+# Same KC_* values as dw's chart; the api derives the realm JWKS URL from these.
+# The `groups` claim carries space UUIDs (== space.id). Blank host => auth off.
+keycloak:
+  host: auth.ollebo.com
+  port: "443"
+  protocol: https
+  realm: master
+
 # One-shot Job (chart/templates/nats-init-job.yaml) that runs code/db/initNats.py
 # to (re)bind the JetStream streams — notably events -> "events.>" for the split
 # public/private mission subjects. Runs once per release.

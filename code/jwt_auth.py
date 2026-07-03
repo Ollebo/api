@@ -4,6 +4,7 @@ import os
 import threading
 import time
 import urllib.request
+import uuid
 
 import jwt
 from jwt.algorithms import ECAlgorithm, RSAAlgorithm
@@ -14,6 +15,29 @@ from db.redisCache import client as redis_client
 JWT_JWKS_URL = os.environ.get("JWT_JWKS_URL")
 JWT_ISSUER = os.environ.get("JWT_ISSUER")
 JWT_AUDIENCE = os.environ.get("JWT_AUDIENCE")
+
+
+def _kc_realm_url():
+    # Build the Keycloak realm base URL from the same KC_* env vars dw uses
+    # (KC_HOST/KC_PORT/KC_PROTOCOL/KC_REALM), so the api shares dw's config.
+    # Standard ports (443/https, 80/http) are omitted to match the token issuer.
+    host = os.environ.get("KC_HOST")
+    realm = os.environ.get("KC_REALM")
+    if not host or not realm:
+        return None
+    proto = os.environ.get("KC_PROTOCOL", "https")
+    port = os.environ.get("KC_PORT", "")
+    netloc = host
+    if port and not ((proto == "https" and port == "443") or (proto == "http" and port == "80")):
+        netloc = "{}:{}".format(host, port)
+    return "{}://{}/realms/{}".format(proto, netloc, realm)
+
+
+# Fall back to KC_* (dw's config) when the JWKS URL isn't set explicitly.
+if not JWT_JWKS_URL:
+    _realm_url = _kc_realm_url()
+    if _realm_url:
+        JWT_JWKS_URL = _realm_url + "/protocol/openid-connect/certs"
 
 _JWKS_TTL = 300
 _JWKS_FETCH_TIMEOUT = 3
@@ -107,7 +131,26 @@ def _extract_bearer(headers_get):
     return token
 
 
+def _as_space_uuid(s):
+    # Keycloak group ids (== space.id) arrive in the `groups` claim. Canonicalize
+    # to a lowercase hyphenated UUID; return None for anything that isn't a UUID
+    # (legacy group paths, default Keycloak groups) so it's dropped rather than
+    # breaking the maps `::uuid[]` cast or matching a space_id by accident.
+    if not isinstance(s, str):
+        return None
+    try:
+        return str(uuid.UUID(s.strip())).lower()
+    except (ValueError, AttributeError):
+        return None
+
+
 def get_auth_context(headers_get):
+    """Return the caller's authorized space_ids (validated Keycloak group UUIDs).
+
+    None when there's no Bearer token or JWT is disabled; otherwise a de-duped
+    list of canonical lowercase UUID strings taken from the `groups` claim
+    (non-UUID entries are dropped). Raises JwtError on an invalid token.
+    """
     token = _extract_bearer(headers_get)
     if token is None:
         return None
@@ -155,4 +198,10 @@ def get_auth_context(headers_get):
     groups_raw = payload.get("groups") or []
     if not isinstance(groups_raw, list):
         return []
-    return [g for g in groups_raw if isinstance(g, str)]
+    out, seen = [], set()
+    for g in groups_raw:
+        gid = _as_space_uuid(g)
+        if gid and gid not in seen:
+            seen.add(gid)
+            out.append(gid)
+    return out

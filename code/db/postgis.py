@@ -141,6 +141,8 @@ def updateMapDataDb(jsonData, db="maps"):
 
 
 def _visibility_clause(groups):
+    # `groups` are the caller's authorized space_ids — validated canonical UUIDs
+    # from jwt_auth.get_auth_context, so the `::uuid[]` cast below is safe.
     if not groups:
         return ("access = %s", ['public'])
     return ("(access = %s OR space_id = ANY(%s::uuid[]))", ['public', list(groups)])

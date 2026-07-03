@@ -50,6 +50,16 @@ spec:
             value: redis
           - name: REDIS_PORT
             value: "6379"
+          # Keycloak config (same KC_* vars as dw). The api derives the JWKS URL
+          # from these to verify Bearer tokens; empty KC_HOST => auth disabled.
+          - name: KC_HOST
+            value: {{ .Values.keycloak.host | quote }}
+          - name: KC_PORT
+            value: {{ .Values.keycloak.port | quote }}
+          - name: KC_PROTOCOL
+            value: {{ .Values.keycloak.protocol | quote }}
+          - name: KC_REALM
+            value: {{ .Values.keycloak.realm | quote }}
           livenessProbe:
             httpGet:
               path: /healthz

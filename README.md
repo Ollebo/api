@@ -181,6 +181,14 @@ Read visibility is driven by the mission's `is_public` column
 This is the same JWT-`groups`-vs-`space_id` model used by the maps read
 endpoints (`GET /maps/`, `POST /search/`).
 
+The Bearer token is a **Keycloak** JWT (verified via JWKS). Its `groups` claim
+carries the caller's Keycloak **group ids, which equal the `space.id` UUIDs**
+(`dw` sets `space.id` = the Keycloak group UUID) — so a caller can read a private
+mission/map exactly when that resource's `space_id` is one of their group UUIDs.
+Non-UUID `groups` entries are ignored. Verification is enabled by the
+`JWT_JWKS_URL` / `JWT_ISSUER` / `JWT_AUDIENCE` env vars (chart `jwt.*` values);
+with `JWT_JWKS_URL` unset, auth is disabled and only public data is served.
+
 ## Endpoints
 
 | Method | Path | Purpose |

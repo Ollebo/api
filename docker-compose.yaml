@@ -9,6 +9,11 @@ services:
       - ./:/data
     ports:
       - 8888:8080
+    # Loads code/db/../.env if present (git-ignored) so local KC/overrides match
+    # dw; the inline vars below are the defaults and keep compose working without it.
+    env_file:
+      - path: .env
+        required: false
     environment:
       - API_KEY=dev-key
       - NATS=nats://nats:4222
@@ -18,6 +23,11 @@ services:
       - POSTGRES_USER=ollebo
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      # Keycloak (same KC_* vars as dw). Verifies real tokens from prod Keycloak.
+      - KC_HOST=auth.ollebo.com
+      - KC_PORT=443
+      - KC_PROTOCOL=https
+      - KC_REALM=master
     depends_on:
       postgres:
         condition: service_healthy

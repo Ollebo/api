@@ -238,7 +238,7 @@ OPENAPI_SPEC = {
                 "type": "http",
                 "scheme": "bearer",
                 "bearerFormat": "JWT",
-                "description": "JWT verified via JWKS (RS256/ES256). Payload must contain a top-level `groups: [<space-uuid>, ...]` array. Used on read endpoints (`GET /maps/`, `POST /search/`, and private-mission event reads `GET /event/{id}/recent` and `/stream`) to unlock rows/streams whose `space_id` is in `groups`. Without a token, only public maps/missions are returned.",
+                "description": "Keycloak JWT verified via JWKS (RS256/ES256). The `groups` claim must contain the caller's Keycloak group ids, which equal `space.id` UUIDs (`groups: [<space-uuid>, ...]`; non-UUID entries are ignored). Used on read endpoints (`GET /maps/`, `POST /search/`, and private-mission event reads `GET /event/{id}/recent` and `/stream`) to unlock rows/streams whose `space_id` is in `groups`. Without a token, only public maps/missions are returned.",
             },
         },
         "schemas": {
