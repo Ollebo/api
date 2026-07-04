@@ -241,6 +241,29 @@ def getMissionByKey(key):
         return None
 
 
+def getMissionHello(key):
+    # Full mission profile for the boot-time "hello" handshake (media URLs + stats).
+    # Accepts key or id like getMissionByKey. Kept separate from getMissionByKey so
+    # the cached auth hot path (event.resolve_mission) keeps its minimal column set.
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute(
+            "SELECT id, name, space_id, is_public, "
+            "camera_stream_low_url, camera_stream_medium_url, camera_stream_high_url, "
+            "picture_upload_low_url, picture_upload_medium_url, picture_upload_high_url, "
+            "number_of_events, number_of_pictures, stats_updated_at "
+            "FROM missions WHERE key = %s OR id = %s LIMIT 1",
+            (str(key), str(key)))
+        return cur.fetchone()
+    except Exception as e:
+        print("getMissionHello failed: {}".format(e))
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return None
+
+
 def getSpaceKey(space_id):
     try:
         cur = conn.cursor()

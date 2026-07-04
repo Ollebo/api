@@ -71,19 +71,41 @@ CREATE TABLE IF NOT EXISTS missions (
     is_private  BOOLEAN,
     is_public   BOOLEAN NOT NULL DEFAULT FALSE,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- Media URLs + stats returned by the /mission/<key>/hello handshake
+    -- (mirrors ../dw migration 013). Stats are scheduler-maintained.
+    camera_stream_low_url     VARCHAR(255),
+    camera_stream_medium_url  VARCHAR(255),
+    camera_stream_high_url    VARCHAR(255),
+    picture_upload_low_url     VARCHAR(255),
+    picture_upload_medium_url  VARCHAR(255),
+    picture_upload_high_url    VARCHAR(255),
+    number_of_events   INTEGER NOT NULL DEFAULT 0,
+    number_of_pictures INTEGER NOT NULL DEFAULT 0,
+    stats_updated_at   TIMESTAMP
 );
 
 -- Demo missions so public (no auth) vs private (JWT group must contain space_id)
 -- event retrieval can be exercised end-to-end. Space ids match the maps demo rows.
-INSERT INTO missions (id, name, status, space_id, key, is_public)
+INSERT INTO missions (id, name, status, space_id, key, is_public,
+  camera_stream_low_url, camera_stream_medium_url, camera_stream_high_url,
+  picture_upload_low_url, picture_upload_medium_url, picture_upload_high_url,
+  number_of_events, number_of_pictures, stats_updated_at)
 VALUES
  ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'public-mission', 'ready',
   '11111111-1111-1111-1111-111111111111',
-  'dddddddd-dddd-dddd-dddd-dddddddddddd', true),
+  'dddddddd-dddd-dddd-dddd-dddddddddddd', true,
+  'https://media.ollebo.com/public-mission/camera/low.m3u8',
+  'https://media.ollebo.com/public-mission/camera/medium.m3u8',
+  'https://media.ollebo.com/public-mission/camera/high.m3u8',
+  'https://media.ollebo.com/public-mission/pictures/low',
+  'https://media.ollebo.com/public-mission/pictures/medium',
+  'https://media.ollebo.com/public-mission/pictures/high',
+  42, 7, now()),
  ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'private-mission', 'ready',
   '22222222-2222-2222-2222-222222222222',
-  'ffffffff-ffff-ffff-ffff-ffffffffffff', false)
+  'ffffffff-ffff-ffff-ffff-ffffffffffff', false,
+  NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, NULL)
 ON CONFLICT (id) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS mission_data (

@@ -159,6 +159,38 @@ OPENAPI_SPEC = {
                 },
             },
         },
+        "/mission/{key}/hello": {
+            "parameters": [
+                {"name": "key", "in": "path", "required": True, "schema": {"type": "string"}, "description": "Mission key or id"}
+            ],
+            "get": {
+                "tags": ["missions"],
+                "summary": "Mission boot-time handshake",
+                "description": "A mission pings this once on startup and gets back its identity, camera-feed and picture-upload URLs (3 quality tiers each), current stats, and the ingest URLs telling it where to send live data next. Stats are maintained by a background scheduler and default to 0.",
+                "responses": {
+                    "200": {
+                        "description": "Mission profile + ingest instructions",
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MissionHello"}}},
+                    },
+                    "404": {
+                        "description": "Mission not found",
+                        "content": {"application/json": {"schema": {"type": "object", "properties": {"ok": {"type": "boolean"}, "error": {"type": "string"}}}}},
+                    },
+                },
+            },
+            "post": {
+                "tags": ["missions"],
+                "summary": "Mission boot-time handshake (POST)",
+                "description": "Identical to GET; accepted so missions can ping with either method.",
+                "responses": {
+                    "200": {
+                        "description": "Mission profile + ingest instructions",
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MissionHello"}}},
+                    },
+                    "404": {"description": "Mission not found"},
+                },
+            },
+        },
         "/event/{mission_id}": {
             "parameters": [
                 {"name": "mission_id", "in": "path", "required": True, "schema": {"type": "string", "format": "uuid"}}
@@ -343,6 +375,53 @@ OPENAPI_SPEC = {
                     "jsonData": {"type": "object", "description": "Arbitrary structured payload; persisted to the `jsondata` column and returned in backfill/recent/live."},
                     "device": {"type": "string", "example": "drone-01"},
                     "deviceJson": {"type": "object", "description": "Arbitrary device metadata; persisted to `devicejson`."},
+                },
+            },
+            "MissionHello": {
+                "type": "object",
+                "description": "Boot-time handshake response for a mission. Media URLs and stats come from the `missions` row; `ingest` is derived from the request host and tells the mission where to send live data.",
+                "properties": {
+                    "ok": {"type": "boolean"},
+                    "mission_id": {"type": "string", "format": "uuid", "description": "Canonical mission id (use this for ingest even if you pinged with the key)."},
+                    "name": {"type": "string"},
+                    "is_public": {"type": "boolean"},
+                    "camera": {
+                        "type": "object",
+                        "description": "Camera feed stream URLs per quality tier (null until set).",
+                        "properties": {
+                            "low": {"type": "string", "nullable": True},
+                            "medium": {"type": "string", "nullable": True},
+                            "high": {"type": "string", "nullable": True},
+                        },
+                    },
+                    "pictures": {
+                        "type": "object",
+                        "description": "Picture upload endpoint URLs per quality tier (null until set).",
+                        "properties": {
+                            "low": {"type": "string", "nullable": True},
+                            "medium": {"type": "string", "nullable": True},
+                            "high": {"type": "string", "nullable": True},
+                        },
+                    },
+                    "stats": {
+                        "type": "object",
+                        "description": "Scheduler-maintained counters.",
+                        "properties": {
+                            "events": {"type": "integer"},
+                            "pictures": {"type": "integer"},
+                            "updated_at": {"type": "string", "format": "date-time", "nullable": True},
+                        },
+                    },
+                    "ingest": {
+                        "type": "object",
+                        "description": "Where the mission sends live data next.",
+                        "properties": {
+                            "event_url": {"type": "string", "format": "uri", "description": "PUT telemetry events here (Event schema)."},
+                            "event_method": {"type": "string", "example": "PUT"},
+                            "stream_url": {"type": "string", "format": "uri", "description": "SSE live event stream."},
+                            "recent_url": {"type": "string", "format": "uri", "description": "Recent events (last 15 min)."},
+                        },
+                    },
                 },
             },
             "WriteResult": {
