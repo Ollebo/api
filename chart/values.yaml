@@ -28,6 +28,15 @@ hpa:
   maxReplicas: 10
   targetCPU: 70
 
+# Object storage for mission picture uploads — same S3-compatible backend and
+# conventions as dw (Hetzner Object Storage). The API stores image bytes here
+# and records the served-back URL on the picture event. AWS_ACCESS_KEY_ID /
+# AWS_SECRET_ACCESS_KEY come from the shared `ollebo` Secret (same keys dw uses).
+storage:
+  endpoint: https://hel1.your-objectstorage.com
+  bucket: map-storage
+  region: hel1
+
 # Keycloak config for JWT verification on private-data reads (missions/maps).
 # Same KC_* values as dw's chart; the api derives the realm JWKS URL from these.
 # The `groups` claim carries space UUIDs (== space.id). Blank host => auth off.
@@ -44,8 +53,9 @@ natsInit:
   enabled: true
 
 # Dummy-traffic simulator (chart/templates/simulator.yaml) that pushes
-# drone/boat/rover telemetry + temperature events into the public mission so the
-# GUI has live data. Set enabled: false once real data flows.
+# drone/boat/rover telemetry, measurement, picture (two-phase) and alert events
+# into the public mission so the GUI has live data. Set enabled: false once real
+# data flows.
 simulator:
   enabled: true
   missionKey: "a744e376-b35c-43ce-8c61-b82d8bb9f9d0"
@@ -54,3 +64,6 @@ simulator:
   boats: 1
   rovers: 1
   tempSensors: 1
+  pictureEvery: 8              # each asset emits a picture event every N ticks
+  pictureUploadDelayTicks: 3   # ticks between the picture event and its byte upload
+  alertEvery: 12               # an asset emits an alert every N ticks

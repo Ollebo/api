@@ -28,12 +28,23 @@ services:
       - KC_PORT=443
       - KC_PROTOCOL=https
       - KC_REALM=master
+      # Object storage for mission pictures — same AWS_* conventions as dw
+      # (Hetzner in prod), MinIO locally. AWS_PUBLIC_ENDPOINT is the
+      # host-reachable base the API hands back / the browser fetches.
+      - AWS_ENDPOINT=http://minio:9000
+      - AWS_PUBLIC_ENDPOINT=http://localhost:9000
+      - AWS_BUCKET=map-storage
+      - AWS_REGION=hel1
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin
     depends_on:
       postgres:
         condition: service_healthy
       nats:
         condition: service_started
       redis:
+        condition: service_started
+      minio:
         condition: service_started
     networks:
       - base
@@ -76,9 +87,43 @@ services:
     networks:
       - base
 
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    ports:
+      - 9000:9000   # S3 API
+      - 9001:9001   # web console
+    volumes:
+      - miniodata:/data
+    networks:
+      - base
+
+  # One-shot: create the map-storage bucket (mirrors dw's AWS_BUCKET) and make it
+  # anonymously readable so the URLs the API returns are fetchable in a browser
+  # during the demo. Exits 0.
+  createbuckets:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 minioadmin minioadmin; do sleep 1; done;
+      mc mb -p local/map-storage;
+      mc anonymous set download local/map-storage;
+      exit 0;
+      "
+    networks:
+      - base
+
 
 volumes:
   pgdata:
+  miniodata:
 
 networks:
   base:

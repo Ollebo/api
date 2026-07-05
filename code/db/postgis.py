@@ -388,6 +388,51 @@ def getRecentEvents(mission_id, minutes=15):
     return rows
 
 
+def setPictureUploaded(mission_id, picture_id, url):
+    """Phase 2 of the two-phase picture flow: the bytes finally arrived.
+
+    Flip the pending `type=picture` row (matched by its jsonData picture_id) to
+    `uploaded`, recording the stored object URL in `img`. If no pending row
+    exists yet (bytes can arrive before the event on a flaky link), insert a
+    fresh picture row already marked uploaded so nothing is lost.
+
+    Returns {"data": "uploaded"|"created"} or {"error": ...}.
+    """
+    update = (
+        "UPDATE mission_data "
+        "SET img = %s, "
+        "    jsonData = COALESCE(jsonData, '{}'::jsonb) "
+        "        || jsonb_build_object('status', 'uploaded', 'uploaded_at', "
+        "           to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')) "
+        "WHERE mission = %s AND type = 'picture' "
+        "AND jsonData->>'picture_id' = %s"
+    )
+    cur = conn.cursor()
+    try:
+        cur.execute(update, (url, mission_id, picture_id))
+        if cur.rowcount == 0:
+            insert = (
+                "INSERT INTO mission_data "
+                "(db_insert_time, mission, type, temperature, humidity, location, "
+                "img, x, y, z, data, jsonData, device, deviceJSON) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"
+            )
+            jsonDataSql = json.dumps({"picture_id": picture_id, "status": "uploaded"})
+            deviceJSON = json.dumps({"value": "none"})
+            cur.execute(insert, (
+                "now()", mission_id, "picture", 0, 0,
+                "Point(0 0)", url, 0, 0, 0, 0, jsonDataSql, "none", deviceJSON,
+            ))
+            conn.commit()
+            return {"data": "created"}
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        print("setPictureUploaded failed: {}".format(e))
+        return {"error": str(e)}
+    return {"data": "uploaded"}
+
+
 ####
 ## Search (replaces Meilisearch)
 ####

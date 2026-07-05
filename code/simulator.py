@@ -1,28 +1,42 @@
 #!/usr/bin/env python3
-"""Mission-event simulator — pushes dummy drone/boat/rover + temperature traffic.
+"""Mission-event simulator — pushes dummy drone/boat/rover + sensor traffic.
 
 Feeds a live SSE stream so the ollebo-maps GUI has something to render. Drives
 several moving assets (different types, different locations) plus a fixed
-weather sensor, all PUT into one public mission. Pure stdlib (urllib) so it runs
-from a laptop or inside the api image with no extra deps.
+weather/measurement sensor, all PUT into one public mission. Pure stdlib
+(urllib) so it runs from a laptop or inside the api image with no extra deps.
 
 Run locally:
     API_BASE=https://api.ollebo.com python3 code/simulator.py
 In-cluster (chart Deployment) it defaults to API_BASE=http://api:8080.
 
+Emits every event type the endpoint understands:
+    location    moving-asset GPS/telemetry (type "telemetry", a location alias)
+    measurement generic sensor value (temperature/humidity/solar) in top-level
+                `data` + jsonData{kind,unit}
+    picture     two-phase photo: a type "picture" event (status pending) now,
+                then the actual image bytes PUT to /mission/<key>/picture/<id>
+                a few ticks LATER (simulating a drone with bad internet)
+    alert       a detection (person/animal/vehicle/...) in jsonData{kind,severity,message}
+
 Payload matches what the GUI reads (liveDrones.ts:eventRowToDroneUpdate):
 device, geopoint=[lon,lat], and jsonData.{altitude,heading,speed,name,model,
-user,visibility,assetType}. Top-level type/temp/humidity/geopoint/x/y/z/device
-persist to mission_data columns; custom fields ride in jsonData.
+user,visibility,assetType}. Top-level type/temp/humidity/geopoint/x/y/z/data/
+device persist to mission_data columns; custom fields ride in jsonData.
 
 Config (env, all optional):
     API_BASE          default http://api:8080
     MISSION_KEY       default a744e376-b35c-43ce-8c61-b82d8bb9f9d0  (demo public mission; key or id)
     INTERVAL_SECONDS  default 2      seconds between ticks
     DRONES/BOATS/ROVERS/TEMP_SENSORS  default 2/1/1/1
-    TEMP_EVERY        default 5      emit temperature every N ticks
+    TEMP_EVERY        default 5      emit a measurement every N ticks
+    MEASUREMENT_KINDS default temperature,humidity,solar  (comma-separated)
+    PICTURE_EVERY     default 8      each asset emits a picture event every N ticks
+    PICTURE_UPLOAD_DELAY_TICKS  default 3   ticks between a picture event and its byte upload
+    ALERT_EVERY       default 12     an asset emits an alert every N ticks
     MAX_TICKS         default 0      0 = run forever
 """
+import base64
 import json
 import math
 import os
@@ -31,6 +45,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import uuid
 
 API_BASE = os.environ.get("API_BASE", "http://api:8080").rstrip("/")
 MISSION_KEY = os.environ.get("MISSION_KEY", "a744e376-b35c-43ce-8c61-b82d8bb9f9d0")
@@ -40,7 +55,24 @@ BOATS = int(os.environ.get("BOATS", "1"))
 ROVERS = int(os.environ.get("ROVERS", "1"))
 TEMP_SENSORS = int(os.environ.get("TEMP_SENSORS", "1"))
 TEMP_EVERY = max(1, int(os.environ.get("TEMP_EVERY", "5")))
+MEASUREMENT_KINDS = [k.strip() for k in os.environ.get(
+    "MEASUREMENT_KINDS", "temperature,humidity,solar").split(",") if k.strip()]
+PICTURE_EVERY = max(1, int(os.environ.get("PICTURE_EVERY", "8")))
+PICTURE_UPLOAD_DELAY_TICKS = max(1, int(os.environ.get("PICTURE_UPLOAD_DELAY_TICKS", "3")))
+ALERT_EVERY = max(1, int(os.environ.get("ALERT_EVERY", "12")))
 MAX_TICKS = int(os.environ.get("MAX_TICKS", "0"))
+
+# Units advertised for each measurement kind (rides in jsonData.unit).
+_MEASUREMENT_UNITS = {"temperature": "C", "humidity": "%", "solar": "W/m2"}
+# What a drone/boat might flag. Free-form; consumed by the GUI's alert layer.
+_ALERT_KINDS = ["person", "animal", "vehicle", "fire", "boat in distress", "debris"]
+# A tiny valid 1x1 JPEG — the actual bytes a "photo upload" carries in the demo.
+# The API stores whatever bytes arrive; a real image just makes the URL render.
+_PIXEL_JPEG = base64.b64decode(
+    "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRof"
+    "Hh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAAB"
+    "AAAAAAAAAAAAAAAAAAAAAv/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AfwD/2Q=="
+)
 
 # Named base locations [lon, lat] reused from ollebo-maps dummy data.
 _BASES = [
@@ -143,25 +175,92 @@ class Asset:
             },
         }
 
+    def picture(self):
+        # Phase 1 of the two-phase picture flow: announce the photo now; the
+        # bytes get uploaded a few ticks later (see put_picture_bytes). Returns
+        # (picture_id, payload) so the caller can schedule the deferred upload.
+        picture_id = uuid.uuid4().hex
+        return picture_id, {
+            "type": "picture",
+            "geopoint": [round(self.lon, 6), round(self.lat, 6)],
+            "device": self.device,
+            "img": "none",
+            "jsonData": {
+                "assetType": self.asset_type,
+                "name": self.name,
+                "picture_id": picture_id,
+                "status": "pending",
+                "camera": "RGB",
+            },
+        }
+
+    def alert(self):
+        kind = random.choice(_ALERT_KINDS)
+        severity = random.choice(["low", "medium", "high"])
+        return {
+            "type": "alert",
+            "geopoint": [round(self.lon, 6), round(self.lat, 6)],
+            "device": self.device,
+            "jsonData": {
+                "assetType": self.asset_type,
+                "name": self.name,
+                "kind": kind,
+                "severity": severity,
+                "message": "{} detected {}".format(self.name, kind),
+            },
+        }
+
 
 class Sensor:
+    """Fixed measurement sensor — emits generic `measurement` events.
+
+    Cycles through the configured MEASUREMENT_KINDS (temperature/humidity/solar
+    by default). The numeric value rides in the top-level `data` column; `kind`
+    and `unit` ride in jsonData. For the temperature kind we also populate the
+    dedicated temp/humidity columns for backward compatibility with older
+    consumers.
+    """
     def __init__(self, device, name, base):
         self.device = device
         self.name = name
         self.lon, self.lat = base
         self.temp = random.uniform(8, 18)
+        self._kind_idx = 0
+
+    def _value(self, kind):
+        if kind == "temperature":
+            # Small random walk so the value drifts realistically.
+            self.temp = max(-20.0, min(40.0, self.temp + random.uniform(-0.4, 0.4)))
+            return round(self.temp, 1)
+        if kind == "humidity":
+            return round(random.uniform(40, 85), 1)
+        if kind == "solar":
+            return round(random.uniform(0, 1000), 1)
+        return round(random.uniform(0, 100), 1)
 
     def reading(self):
-        # Small random walk so the value drifts realistically.
-        self.temp = max(-20.0, min(40.0, self.temp + random.uniform(-0.4, 0.4)))
-        return {
-            "type": "temperature",
-            "temp": round(self.temp, 1),
-            "humidity": round(random.uniform(40, 85), 1),
+        kind = MEASUREMENT_KINDS[self._kind_idx % len(MEASUREMENT_KINDS)]
+        self._kind_idx += 1
+        value = self._value(kind)
+        payload = {
+            "type": "measurement",
+            "data": value,
             "geopoint": [round(self.lon, 6), round(self.lat, 6)],
             "device": self.device,
-            "jsonData": {"assetType": "sensor", "name": self.name},
+            "jsonData": {
+                "assetType": "sensor",
+                "name": self.name,
+                "kind": kind,
+                "unit": _MEASUREMENT_UNITS.get(kind, ""),
+            },
         }
+        # Back-compat: keep the dedicated columns populated for temp/humidity.
+        if kind == "temperature":
+            payload["temp"] = value
+            payload["humidity"] = round(random.uniform(40, 85), 1)
+        elif kind == "humidity":
+            payload["humidity"] = value
+        return payload
 
 
 def put_event(payload):
@@ -178,6 +277,24 @@ def put_event(payload):
         return e.code
     except Exception as e:  # transport error — log and keep going
         print("send failed for {}: {}".format(payload.get("device"), e), flush=True)
+        return -1
+
+
+def put_picture_bytes(picture_id, data):
+    # Phase 2: upload the raw image bytes for a previously-announced picture.
+    req = urllib.request.Request(
+        "{}/mission/{}/picture/{}".format(API_BASE, MISSION_KEY, picture_id),
+        data=data,
+        method="PUT",
+        headers={"Content-Type": "image/jpeg"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return r.status
+    except urllib.error.HTTPError as e:
+        return e.code
+    except Exception as e:  # transport error — log and keep going
+        print("upload failed for {}: {}".format(picture_id, e), flush=True)
         return -1
 
 
@@ -206,16 +323,34 @@ def main():
     tick = 0
     sent = 0
     last_status = None
+    pending_uploads = []  # (due_tick, picture_id) — deferred phase-2 byte uploads
     while MAX_TICKS == 0 or tick < MAX_TICKS:
         tick += 1
         for a in assets:
             a.step(INTERVAL)
             last_status = put_event(a.telemetry())
             sent += 1
+            # Occasionally take a photo (announce now, upload the bytes later).
+            if tick % PICTURE_EVERY == 0:
+                picture_id, payload = a.picture()
+                last_status = put_event(payload)
+                sent += 1
+                pending_uploads.append((tick + PICTURE_UPLOAD_DELAY_TICKS, picture_id))
+            # Occasionally raise an alert.
+            if tick % ALERT_EVERY == 0:
+                last_status = put_event(a.alert())
+                sent += 1
         if tick % TEMP_EVERY == 0:
             for s in sensors:
                 last_status = put_event(s.reading())
                 sent += 1
+        # Fire any deferred picture uploads that have now "reconnected".
+        due = [pid for due_tick, pid in pending_uploads if due_tick <= tick]
+        for picture_id in due:
+            last_status = put_picture_bytes(picture_id, _PIXEL_JPEG)
+            sent += 1
+        if due:
+            pending_uploads = [pu for pu in pending_uploads if pu[0] > tick]
         if tick % 15 == 0:
             print("tick {} — {} events sent (last status {})".format(tick, sent, last_status), flush=True)
         time.sleep(INTERVAL)

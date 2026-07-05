@@ -16,6 +16,7 @@ from prometheus_flask_exporter import PrometheusMetrics
 from maps import maps, mapsSearch
 from event import event, recent, authorize_mission_read
 from missions import missions, mission, missionValidate, missionHello
+from pictures import upload_picture, download_picture
 from openapi import OPENAPI_SPEC
 from sse_bridge import start_bridge, subscribe
 from db.postgis import getRecentEvents, conn as pg_conn
@@ -23,6 +24,8 @@ from auth import verify_map_request
 from jwt_auth import get_auth_context, JwtError
 
 app = Flask(__name__)
+# Cap picture (and any) upload bodies so a runaway request can't exhaust memory.
+app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("MAX_UPLOAD_BYTES", 25 * 1024 * 1024))
 # The dashboard opens the SSE stream with EventSource {withCredentials: true},
 # so responses must carry Access-Control-Allow-Credentials: true — which in turn
 # forbids a wildcard Access-Control-Allow-Origin. Allowlist specific origins
@@ -106,6 +109,14 @@ def missionValidateRoute(key):
 @app.route("/mission/<key>/hello",methods = ['GET', 'POST'])
 def missionHelloRoute(key):
 	return missionHello(key, request)
+
+@app.route("/mission/<key>/picture/<picture_id>",methods = ['GET', 'PUT'])
+def missionPictureRoute(key, picture_id):
+	# PUT = phase 2 of the picture flow: raw image bytes uploaded (possibly much)
+	# later than the phase-1 picture event. GET = retrieve those bytes back.
+	if request.method == 'PUT':
+		return upload_picture(key, picture_id, request)
+	return download_picture(key, picture_id, request)
 
 
 

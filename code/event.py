@@ -6,10 +6,27 @@ from db.redisCache import getCachedMission, setCachedMission
 from jwt_auth import get_auth_context, JwtError
 
 
+# Canonical event types a drone/boat/rover can emit. `type` is stored verbatim
+# in mission_data (no wire rewrite) so existing consumers keep working, but we
+# recognise a small formal set for documentation, per-type handling and demo
+# traffic. Legacy aliases map onto a canonical type for reference only.
+#   location    -> GPS/telemetry: geopoint/x/y/z/device (+ jsonData)
+#   measurement -> generic sensor value: `data` + jsonData{kind,unit} (temp/humidity too)
+#   picture     -> two-phase photo: jsonData{picture_id,status}; bytes uploaded later
+#   alert       -> detection: jsonData{kind,severity,message}
+KNOWN_EVENT_TYPES = {"location", "measurement", "picture", "alert"}
+TYPE_ALIASES = {"telemetry": "location", "temperature": "measurement"}
+
+
 def event(payload, request, mission_id):
+    if not isinstance(payload, dict):
+        return jsonify({"error": "invalid or missing JSON body"}), 400
+
     mission = resolve_mission(mission_id)
     if mission is None:
         return jsonify({"error": "mission not found"}), 404
+
+    _normalize_event(payload)
 
     # Canonicalize on the mission UUID so backfill/read lookups line up
     # regardless of whether the caller posted by key or id.
@@ -24,6 +41,28 @@ def event(payload, request, mission_id):
     except Exception as e:
         print("NATS publish failed: {}".format(e))
     return result
+
+
+def _normalize_event(payload):
+    """Light, non-destructive typing pass run before storing/publishing.
+
+    Does NOT rewrite the payload's `type` on the wire (existing GUI/SSE
+    consumers key on the original values). It only warns on unrecognised
+    types and, for `picture` events, ensures the two-phase bookkeeping
+    (`picture_id` + a default `status`) is present in `jsonData`.
+    """
+    etype = payload.get("type", "none")
+    if etype not in KNOWN_EVENT_TYPES and etype not in TYPE_ALIASES:
+        print("event: unknown type {!r}; storing as-is".format(etype))
+
+    if etype == "picture":
+        jd = payload.get("jsonData")
+        if not isinstance(jd, dict):
+            jd = {}
+            payload["jsonData"] = jd
+        if not jd.get("picture_id"):
+            print("event: picture event without picture_id; upload cannot be correlated")
+        jd.setdefault("status", "pending")
 
 
 def recent(mission_id, minutes=15):

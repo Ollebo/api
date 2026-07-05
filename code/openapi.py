@@ -212,6 +212,37 @@ OPENAPI_SPEC = {
                 },
             },
         },
+        "/mission/{key}/picture/{picture_id}": {
+            "parameters": [
+                {"name": "key", "in": "path", "required": True, "schema": {"type": "string"}, "description": "Mission key or id"},
+                {"name": "picture_id", "in": "path", "required": True, "schema": {"type": "string"}, "description": "The picture_id announced by the phase-1 `picture` event"},
+            ],
+            "get": {
+                "tags": ["events"],
+                "summary": "Retrieve picture bytes",
+                "description": "Streams back the stored image bytes for a picture (uploaded via PUT). Served from object storage through the API, so it works regardless of bucket ACL.",
+                "responses": {
+                    "200": {"description": "The image", "content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}}},
+                    "404": {"description": "Mission or picture not found"},
+                    "500": {"description": "Storage error"},
+                },
+            },
+            "put": {
+                "tags": ["events"],
+                "summary": "Upload picture bytes (phase 2)",
+                "description": "Phase 2 of the two-phase picture flow: uploads the raw image bytes for a `picture` event announced earlier (possibly much later — drones with poor connectivity upload when they can). The bytes are stored in object storage; the matching `mission_data` row is flipped to `status: uploaded` with its `img` set to the stored URL, and a `picture`/`uploaded` frame is re-published to live SSE subscribers. If no pending row exists yet, a new uploaded picture row is created. Body is the raw image (e.g. `image/jpeg`), not JSON.",
+                "requestBody": {
+                    "required": True,
+                    "content": {"image/jpeg": {"schema": {"type": "string", "format": "binary"}}, "application/octet-stream": {"schema": {"type": "string", "format": "binary"}}},
+                },
+                "responses": {
+                    "200": {"description": "Stored", "content": {"application/json": {"schema": {"type": "object", "properties": {"data": {"type": "string"}, "url": {"type": "string"}}}}}},
+                    "400": {"description": "Empty body"},
+                    "404": {"description": "Mission not found"},
+                    "500": {"description": "Storage or DB error"},
+                },
+            },
+        },
         "/event/{mission_id}/recent": {
             "parameters": [
                 {"name": "mission_id", "in": "path", "required": True, "schema": {"type": "string"}, "description": "Mission key or id"},
@@ -348,15 +379,26 @@ OPENAPI_SPEC = {
             "Event": {
                 "type": "object",
                 "description": (
-                    "A single mission telemetry sample (e.g. one drone reading). Mapped "
+                    "A single mission event (e.g. one drone reading). Mapped "
                     "columns are stored in the `mission_data` hypertable and replayed in "
                     "`backfill`/`recent`; the FULL body is echoed back verbatim as the "
                     "`payload` of every `live` SSE frame, so custom keys inside `jsonData` "
-                    "(and any extra top-level keys) round-trip to live subscribers."
+                    "(and any extra top-level keys) round-trip to live subscribers.\n\n"
+                    "The `type` field selects the event kind. Canonical types:\n"
+                    "- `location` (alias `telemetry`): GPS position in `geopoint`/`x`/`y`/`z`.\n"
+                    "- `measurement` (alias `temperature`): a generic sensor value in `data` "
+                    "with `jsonData.{kind,unit}` (e.g. temperature/humidity/solar); the "
+                    "temperature kind also fills `temp`/`humidity`.\n"
+                    "- `picture`: phase 1 of a two-phase photo — carries `jsonData.picture_id` "
+                    "and `jsonData.status` (defaults to `pending`); the image bytes are "
+                    "uploaded later to `PUT /mission/{key}/picture/{picture_id}`, which flips "
+                    "the row to `uploaded` and sets `img` to the stored URL.\n"
+                    "- `alert`: a detection, with `jsonData.{kind,severity,message}`.\n\n"
+                    "Unknown types are stored and logged, not rejected."
                 ),
                 "required": ["type"],
                 "properties": {
-                    "type": {"type": "string", "example": "telemetry", "description": "Reading/category label."},
+                    "type": {"type": "string", "enum": ["location", "measurement", "picture", "alert", "telemetry", "temperature"], "example": "measurement", "description": "Event kind (see schema description). Legacy aliases `telemetry`/`temperature` are accepted."},
                     "temp": {"type": "number", "description": "Temperature; stored as `temperature`."},
                     "humidity": {"type": "number"},
                     "geopoint": {

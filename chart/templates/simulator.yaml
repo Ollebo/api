@@ -1,8 +1,9 @@
 {{- if .Values.simulator.enabled }}
 # Dummy-traffic simulator that runs code/simulator.py (baked into the api image)
-# and pushes drone/boat/rover telemetry + temperature events to the public
-# mission so the GUI has live data to render. Reuses the api image with a
-# command override — no separate build. Disable with simulator.enabled=false.
+# and pushes drone/boat/rover telemetry, measurement, picture (two-phase) and
+# alert events to the public mission so the GUI has live data to render. Reuses
+# the api image with a command override — no separate build. Disable with
+# simulator.enabled=false.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -43,6 +44,12 @@ spec:
               value: {{ .Values.simulator.rovers | quote }}
             - name: TEMP_SENSORS
               value: {{ .Values.simulator.tempSensors | quote }}
+            - name: PICTURE_EVERY
+              value: {{ .Values.simulator.pictureEvery | quote }}
+            - name: PICTURE_UPLOAD_DELAY_TICKS
+              value: {{ .Values.simulator.pictureUploadDelayTicks | quote }}
+            - name: ALERT_EVERY
+              value: {{ .Values.simulator.alertEvery | quote }}
           resources:
             requests:
               cpu: 25m

@@ -60,6 +60,27 @@ spec:
             value: {{ .Values.keycloak.protocol | quote }}
           - name: KC_REALM
             value: {{ .Values.keycloak.realm | quote }}
+          # Object storage for mission pictures — same S3-compatible backend and
+          # AWS_* conventions as dw (Hetzner in prod). Credentials come from the
+          # shared `ollebo` Secret (same keys dw reads).
+          - name: AWS_ENDPOINT
+            value: {{ .Values.storage.endpoint | quote }}
+          - name: AWS_BUCKET
+            value: {{ .Values.storage.bucket | quote }}
+          - name: AWS_REGION
+            value: {{ .Values.storage.region | quote }}
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: ollebo
+                key: AWS_ACCESS_KEY_ID
+                optional: true
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: ollebo
+                key: AWS_SECRET_ACCESS_KEY
+                optional: true
           livenessProbe:
             httpGet:
               path: /healthz

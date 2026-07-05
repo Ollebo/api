@@ -196,7 +196,35 @@ with `JWT_JWKS_URL` unset, auth is disabled and only public data is served.
 | `PUT`  | `/event/<key>` | Append one event (see `Event` schema). Returns `{"data":"stored"}`. |
 | `GET`  | `/event/<key>/recent?minutes=15` | Last N minutes (1–60) from Postgres, ascending. |
 | `GET`  | `/event/<key>/stream` | SSE: `backfill` → `ready` → `live` frames, `: ping` keepalive every 15s. |
+| `PUT`  | `/mission/<key>/picture/<picture_id>` | Upload the image bytes for a `picture` event (phase 2). Body is the raw image. Returns `{"data":"uploaded","url":…}`. |
+| `GET`  | `/mission/<key>/picture/<picture_id>` | Retrieve the stored image bytes back through the API. |
 | `GET`  | `/mission/validate/<key>` | Resolve a key → `{valid, mission_id, name}`. |
+
+### Event types
+
+Every event carries a `type`. The endpoint understands four canonical types
+(plus two legacy aliases kept working); an unknown `type` is still stored and
+logged, never rejected. Mapped columns land in `mission_data`; per-type detail
+rides in the `jsonData` JSONB and round-trips verbatim on the live stream.
+
+| `type` | Meaning | Key fields |
+|---|---|---|
+| `location` (alias `telemetry`) | GPS position of a drone/boat/rover | `geopoint` `[lon,lat]`, `x`/`y`/`z`, `device` |
+| `measurement` (alias `temperature`) | A generic sensor reading — temperature, humidity, **solar exposure**, anything | value in `data`; `jsonData.{kind,unit}` (temperature also fills `temp`/`humidity`) |
+| `picture` | A photo, in **two phases** (announce → upload bytes later) | `jsonData.{picture_id,status}`; `img` becomes the stored URL once uploaded |
+| `alert` | A detection ("person detected", etc.) | `jsonData.{kind,severity,message}` |
+
+Examples (each is a body for `PUT /event/<key>`):
+
+```jsonc
+// measurement — a solar-exposure reading
+{"type":"measurement","data":842.5,"geopoint":[18.0686,59.3293],
+ "device":"sensor-01","jsonData":{"kind":"solar","unit":"W/m2","name":"Weather 01"}}
+
+// alert — person detected
+{"type":"alert","geopoint":[18.0686,59.3293],"device":"drone-01",
+ "jsonData":{"kind":"person","severity":"high","message":"Person detected in the search area"}}
+```
 
 ### Producing (mock a drone sending telemetry)
 
@@ -263,25 +291,70 @@ new EventSource("https://api.ollebo.com/event/public/stream")
   });
 ```
 
+## Pictures (two-phase upload + retrieval)
+
+A drone announces a photo the instant it takes it, but the bytes may arrive much
+later (poor connectivity → upload when reconnected). So pictures are **two
+phases**:
+
+1. **Announce** — `PUT /event/<key>` with `type:"picture"` and a `picture_id` in
+   `jsonData` (status defaults to `pending`). This is a normal event: it lands in
+   `mission_data` and streams live like any other.
+2. **Upload the bytes** — later, `PUT /mission/<key>/picture/<picture_id>` with
+   the raw image as the body. The API stores it in object storage, flips the
+   matching row to `status:"uploaded"` and sets `img` to the stored URL, and
+   re-publishes a `picture`/`uploaded` frame so live subscribers see the
+   transition. (If the bytes arrive before the announce event, a fresh uploaded
+   row is created instead.)
+
+Retrieve the image any time with `GET /mission/<key>/picture/<picture_id>` — it
+streams the bytes back through the API (works regardless of bucket ACL).
+
+```bash
+# 1. announce
+curl -X PUT https://api.ollebo.com/event/<key> -H 'Content-Type: application/json' \
+  -d '{"type":"picture","geopoint":[18.0686,59.3293],"jsonData":{"picture_id":"p-1","status":"pending"}}'
+# 2. upload the bytes (later)
+curl -X PUT --data-binary @photo.jpg -H 'Content-Type: image/jpeg' \
+  https://api.ollebo.com/mission/<key>/picture/p-1
+# -> {"data":"uploaded","url":"https://hel1.your-objectstorage.com/map-storage/<realm>/missions/<id>/pictures/p-1"}
+# 3. fetch it back
+curl https://api.ollebo.com/mission/<key>/picture/p-1 --output got.jpg
+```
+
+**Object storage.** Bytes go to the same S3-compatible backend as the `dw` app
+(Hetzner Object Storage in prod), using the shared `AWS_*` conventions and
+credentials from the `ollebo` k8s Secret. Objects are keyed
+`<realm>/missions/<mission_id>/pictures/<picture_id>` in the `map-storage`
+bucket. Config (chart `storage.*` / env): `AWS_ENDPOINT`, `AWS_BUCKET`,
+`AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`. Locally,
+`docker-compose` runs **MinIO** as a stand-in (bucket auto-created) so the whole
+flow works offline.
+
 ## Dummy traffic simulator
 
-`code/simulator.py` pushes realistic dummy telemetry so the GUI has live data to
+`code/simulator.py` pushes realistic dummy traffic so the GUI has live data to
 render. It drives several moving assets of different types (**drone / boat /
-rover**) at different locations plus a fixed **temperature** sensor, all into the
-public mission. It runs as a pod beside the API (`chart/templates/simulator.yaml`,
-gated by `simulator.enabled`, on by default) and can also be run locally:
+rover**) at different locations plus a fixed measurement sensor, and emits **every
+event type**: `location` telemetry, `measurement` (temperature/humidity/solar),
+`picture` (announced then uploaded a few ticks later, simulating bad internet),
+and `alert` detections — all into the public mission. It runs as a pod beside the
+API (`chart/templates/simulator.yaml`, gated by `simulator.enabled`, on by
+default) and can also be run locally:
 
 ```bash
 API_BASE=https://api.ollebo.com \
 MISSION_KEY=a744e376-b35c-43ce-8c61-b82d8bb9f9d0 \
 python3 code/simulator.py
-# knobs (env): INTERVAL_SECONDS, DRONES, BOATS, ROVERS, TEMP_SENSORS, TEMP_EVERY, MAX_TICKS
+# knobs (env): INTERVAL_SECONDS, DRONES, BOATS, ROVERS, TEMP_SENSORS, TEMP_EVERY,
+#              MEASUREMENT_KINDS, PICTURE_EVERY, PICTURE_UPLOAD_DELAY_TICKS,
+#              ALERT_EVERY, MAX_TICKS
 ```
 
-Each asset emits the `Event` shape above with `jsonData.{assetType,name,model,
-altitude,heading,speed,battery,visibility}` so the ollebo-maps consumer renders
-it directly. **Turn it off in prod once real data flows:** set
-`simulator.enabled: false` in `chart/values.yaml` and redeploy.
+Moving assets emit `jsonData.{assetType,name,model,altitude,heading,speed,
+battery,visibility}` so the ollebo-maps consumer renders them directly. **Turn it
+off in prod once real data flows:** set `simulator.enabled: false` in
+`chart/values.yaml` and redeploy.
 
 ## Version / which build is live
 
@@ -306,3 +379,17 @@ API_BASE=https://api.ollebo.com python3 test/e2e_mission_stream.py
 ```
 
 Or via the `/e2e-mission-stream` Claude skill.
+
+## Feature demo tool
+
+`test/demo_features.py` fires one of **each** event type into a mission so you can
+see the features live — a `measurement`, a `person detected` `alert`, and a
+two-phase `picture` that pulls a **real cat photo off the internet**
+(`cataas.com`), uploads it, and retrieves it back byte-for-byte (stdlib only):
+
+```bash
+python3 test/demo_features.py
+# watch it land, in another terminal:
+curl -N http://localhost:8888/event/<MISSION_KEY>/stream
+# knobs (env): API_BASE, MISSION_KEY, CAT_URL   (falls back to a generated image offline)
+```
