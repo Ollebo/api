@@ -63,22 +63,25 @@ def mapsSearch(payload, groups=None):
 def maps(payload, request, groups=None):
     print(request.method)
 
-    if request.method   == "POST":
+    # POST and PATCH both persist worker results by updating the map row in
+    # place. The map-maker worker uses PATCH /maps/<mapid>; older callers POST
+    # to /maps/ with mapid in the body. Both land here with the same payload.
+    if request.method in ("POST", "PATCH"):
         print("Update database")
         if payload is None:
-            print("ERROR POST /maps/ bad payload: missing=['<body>']")
+            print("ERROR {} /maps/ bad payload: missing=['<body>']".format(request.method))
             return jsonify({"error": "missing body", "missing": ["<body>"]}), 400
         payload["recordtime"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
         missing = _validate_post(payload)
         if missing:
-            print("ERROR POST /maps/ bad payload: missing={} mapid={} action={} keys={}".format(
-                missing, payload.get("mapid"), payload.get("action"), sorted(payload.keys())
+            print("ERROR {} /maps/ bad payload: missing={} mapid={} action={} keys={}".format(
+                request.method, missing, payload.get("mapid"), payload.get("action"), sorted(payload.keys())
             ))
             return jsonify({"error": "invalid payload", "missing": missing}), 400
         try:
             return updateMapDataDb(payload, "maps")
         except Exception as e:
-            print("ERROR POST /maps/ db error: mapid={} err={}".format(payload.get("mapid"), e))
+            print("ERROR {} /maps/ db error: mapid={} err={}".format(request.method, payload.get("mapid"), e))
             return jsonify({"error": "db error", "detail": str(e)}), 500
     if request.method == "GET":
         print("List maps (groups={})".format(groups))

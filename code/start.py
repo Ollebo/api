@@ -81,6 +81,25 @@ def mapsRoute():
 		return jsonify({"error": "unauthorized", "detail": str(e)}), 401
 	return maps(payload, request, groups=groups)
 
+@app.route("/maps/<mapid>",methods = ['PATCH'])
+def mapPatchRoute(mapid):
+	# The map-maker worker reports results via PATCH /maps/<mapid> with the full
+	# record in the body. The UUID in the URL is authoritative for the row being
+	# updated; cross-check it against body.mapid/mapID so a mismatched body can't
+	# update the wrong map. Update logic is shared with POST (see maps()).
+	payload = request.get_json(silent=True)
+	if isinstance(payload, dict):
+		body_mapid = payload.get("mapid") or payload.get("mapID")
+		if body_mapid and str(body_mapid) != str(mapid):
+			print("ERROR PATCH /maps/ mapid mismatch: url={} body={}".format(mapid, body_mapid))
+			return jsonify({"error": "mapid mismatch", "url": mapid, "body": body_mapid}), 400
+		payload["mapid"] = mapid
+	unauthorized = verify_map_request(request.method, payload, request.headers.get)
+	if unauthorized is not None:
+		body, status = unauthorized
+		return jsonify(body), status
+	return maps(payload, request)
+
 @app.route("/search/",methods = ['POST'])
 def searchRoute():
 	payload = request.get_json(silent=True)

@@ -52,7 +52,7 @@ def verify_map_request(method, payload, headers_get):
         except (ValueError, AttributeError, TypeError):
             _log_unauthorized(method, raw, headers_get, "bad_space_id")
             return _unauthorized()
-    elif method == "POST":
+    elif method in ("POST", "PATCH"):
         mapid = payload.get("mapid")
         if not mapid:
             _log_unauthorized(method, None, headers_get, "missing_mapid")
