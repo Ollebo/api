@@ -98,7 +98,7 @@ OPENAPI_SPEC = {
             "post": {
                 "tags": ["search"],
                 "summary": "Search maps",
-                "description": "Postgres ILIKE search on `name` and `tags`, optionally bounded by `created_at` range. Same visibility rules as `GET /maps/`: anonymous callers see only `access='public'` rows; a valid `Authorization: Bearer <jwt>` additionally unlocks rows whose `space_id` is in the token's `groups` claim.",
+                "description": "Postgres ILIKE search on `name` and `tags`, optionally bounded by `created_at` range. Returns only finished maps (`status = 'ready'`). Same visibility rules as `GET /maps/`: anonymous callers see only `access='public'` rows; a valid `Authorization: Bearer <jwt>` additionally unlocks private rows whose `space_id` is in the token's `groups` claim.",
                 "security": [{"BearerAuth": []}, {}],
                 "requestBody": {
                     "required": True,

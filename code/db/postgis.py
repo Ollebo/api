@@ -444,8 +444,9 @@ def searchMaps(payload, groups=None):
     todate = payload.get("todate")
 
     vis_sql, vis_params = _visibility_clause(groups)
-    clauses = [vis_sql]
-    params = list(vis_params)
+    # Only surface finished maps; visibility still applies (public + entitled private).
+    clauses = [vis_sql, "status = %s"]
+    params = list(vis_params) + ["ready"]
 
     if name:
         clauses.append("name ILIKE %s")
