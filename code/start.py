@@ -14,13 +14,14 @@ from flask_cors import CORS
 from flask_swagger_ui import get_swaggerui_blueprint
 from prometheus_flask_exporter import PrometheusMetrics
 from maps import maps, mapsSearch
+from models import models
 from event import event, recent, authorize_mission_read
 from missions import missions, mission, missionValidate, missionHello
 from pictures import upload_picture, download_picture
 from openapi import OPENAPI_SPEC
 from sse_bridge import start_bridge, subscribe
 from db.postgis import getRecentEvents, conn as pg_conn
-from auth import verify_map_request
+from auth import verify_map_request, verify_model_request
 from jwt_auth import get_auth_context, JwtError
 
 app = Flask(__name__)
@@ -99,6 +100,40 @@ def mapPatchRoute(mapid):
 		body, status = unauthorized
 		return jsonify(body), status
 	return maps(payload, request)
+
+@app.route("/models/",methods = ['GET', 'POST', 'PUT'])
+def modelsRoute():
+	payload = request.get_json(silent=True)
+	if request.method in ('PUT', 'POST'):
+		unauthorized = verify_model_request(request.method, payload, request.headers.get)
+		if unauthorized is not None:
+			body, status = unauthorized
+			return jsonify(body), status
+		return models(payload, request)
+	try:
+		groups = get_auth_context(request.headers.get)
+	except JwtError as e:
+		_log_jwt_failure("GET /models/", str(e))
+		return jsonify({"error": "unauthorized", "detail": str(e)}), 401
+	return models(payload, request, groups=groups)
+
+@app.route("/models/<modelid>",methods = ['PATCH'])
+def modelPatchRoute(modelid):
+	# The map-maker worker copies the model file into the public/private bucket
+	# and reports the new path via PATCH /models/<modelid>. Mirror the maps flow:
+	# the URL UUID is authoritative; cross-check it against body.modelid/modelID.
+	payload = request.get_json(silent=True)
+	if isinstance(payload, dict):
+		body_modelid = payload.get("modelid") or payload.get("modelID")
+		if body_modelid and str(body_modelid) != str(modelid):
+			print("ERROR PATCH /models/ modelid mismatch: url={} body={}".format(modelid, body_modelid))
+			return jsonify({"error": "modelid mismatch", "url": modelid, "body": body_modelid}), 400
+		payload["modelid"] = modelid
+	unauthorized = verify_model_request(request.method, payload, request.headers.get)
+	if unauthorized is not None:
+		body, status = unauthorized
+		return jsonify(body), status
+	return models(payload, request)
 
 @app.route("/search/",methods = ['POST'])
 def searchRoute():

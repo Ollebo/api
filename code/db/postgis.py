@@ -299,6 +299,90 @@ def getMapSpaceId(mapid):
 
 
 ####
+## Models (mirror of maps: worker copies the file, then PATCH /models/<id>)
+####
+_MODEL_ACTION_TO_STATUS = {
+    "makingModel": "processing",
+    "ready": "ready",
+    "error": "failed",
+}
+
+
+def getModelSpaceId(modelid):
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT space_id::text FROM model WHERE modelid = %s LIMIT 1", (str(modelid),))
+        row = cur.fetchone()
+    except Exception as e:
+        print("getModelSpaceId failed: modelid={} err={}".format(modelid, e))
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return None
+    if row is None:
+        return None
+    return row[0]
+
+
+def updateModelDataDb(jsonData, db="model"):
+    modelid = jsonData['modelid']
+    action = jsonData['action']
+    status = _MODEL_ACTION_TO_STATUS.get(action)
+    if status is None:
+        print("ERROR updateModelDataDb unknown action: modelid={} action={}".format(modelid, action))
+        return {"error": "unknown action", "action": action}
+
+    sets = ["status = %s", "updated_at = now()"]
+    params = [status]
+
+    # The worker copies the file to the public/private bucket and reports the
+    # new object key; store it as the served originfile.
+    origin = jsonData.get('originFile') or jsonData.get('originfile')
+    if origin:
+        sets.append("originfile = %s")
+        params.append(origin)
+
+    params.append(modelid)
+    query = "UPDATE model SET " + ", ".join(sets) + " WHERE modelid = %s::uuid;"
+
+    cur = conn.cursor()
+    try:
+        cur.execute(query, params)
+    except Exception as e:
+        conn.rollback()
+        print("ERROR updateModelDataDb failed: modelid={} action={} err={}".format(modelid, action, e))
+        raise
+    rowcount = cur.rowcount
+    conn.commit()
+    if rowcount == 0:
+        print("ERROR updateModelDataDb no row matched: modelid={} action={}".format(modelid, action))
+        return {"error": "unknown modelid", "modelid": modelid}
+    return {"data": "saved", "modelid": modelid}
+
+
+def getModelsDb(groups=None):
+    vis_sql, vis_params = _visibility_clause(groups)
+    query = (
+        "SELECT *, "
+        "TO_CHAR(created_at, 'YYYY-MM-DD') AS created_at, "
+        "TO_CHAR(updated_at, 'YYYY-MM-DD') AS updated_at "
+        "FROM model WHERE " + vis_sql
+    )
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute(query, vis_params)
+        return cur.fetchall()
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        print("getModelsDb failed: {}".format(e))
+        return {"error": str(e)}
+
+
+####
 ## Events / mission_data
 ####
 def addEvent(jsonData, db="mission_data", mission_id="none"):

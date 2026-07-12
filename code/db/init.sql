@@ -59,6 +59,26 @@ VALUES
   ST_SetSRID(ST_MakePoint(18.0686, 59.3293), 4326)::geography)
 ON CONFLICT DO NOTHING;
 
+-- 3D models (glb/gltf/obj). Mirrors the canonical `model` table owned by dw
+-- (../dw/db/tables/model.sql); the worker PATCHes /models/<id> to flip status
+-- and store the copied file's path in `originfile`.
+CREATE TABLE IF NOT EXISTS model (
+    id          SERIAL PRIMARY KEY,
+    creator_id  UUID,
+    space_id    UUID,
+    asset_id    UUID,
+    name        VARCHAR(250),
+    tags        VARCHAR(250),
+    status      VARCHAR(20) NOT NULL DEFAULT 'pending'
+                CHECK (status IN ('pending', 'processing', 'ready', 'failed')),
+    access      VARCHAR(20),
+    originfile  VARCHAR(500),
+    modelid     UUID UNIQUE,
+    type        VARCHAR(50),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- `key` is the mission's write/lookup secret; `is_public` drives read
 -- visibility (mirrors the canonical `missions` table in ../dw/db/tables/asset.sql).
 -- `is_private` is kept for parity with dw but no longer read by the api.

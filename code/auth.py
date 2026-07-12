@@ -2,7 +2,7 @@ import hmac
 import os
 import uuid
 
-from db.postgis import getSpaceKey, getMapSpaceId
+from db.postgis import getSpaceKey, getMapSpaceId, getModelSpaceId
 from db.redisCache import getCachedSpaceKey, setCachedSpaceKey
 
 
@@ -60,6 +60,56 @@ def verify_map_request(method, payload, headers_get):
         space_id = getMapSpaceId(mapid)
         if not space_id:
             _log_unauthorized(method, None, headers_get, "unknown_mapid")
+            return _unauthorized()
+    else:
+        _log_unauthorized(method, None, headers_get, "bad_method")
+        return _unauthorized()
+
+    space_key = _lookup_space_key(space_id)
+    if not space_key:
+        _log_unauthorized(method, space_id, headers_get, "no_space_key")
+        return _unauthorized()
+
+    if not hmac.compare_digest(provided, space_key):
+        _log_unauthorized(method, space_id, headers_get, "key_mismatch")
+        return _unauthorized()
+
+    return None
+
+
+def verify_model_request(method, payload, headers_get):
+    # Mirror of verify_map_request for /models: derive the space from the
+    # modelid (POST/PATCH) or the body (PUT), then match the space key.
+    provided = headers_get("X-Api-Key")
+    if not provided:
+        _log_unauthorized(method, None, headers_get, "no_header")
+        return _unauthorized()
+
+    if API_KEY and hmac.compare_digest(provided, API_KEY):
+        return None
+
+    if not isinstance(payload, dict):
+        _log_unauthorized(method, None, headers_get, "no_payload")
+        return _unauthorized()
+
+    if method == "PUT":
+        raw = payload.get("space_id")
+        if not raw:
+            _log_unauthorized(method, None, headers_get, "missing_space_id")
+            return _unauthorized()
+        try:
+            space_id = str(uuid.UUID(str(raw)))
+        except (ValueError, AttributeError, TypeError):
+            _log_unauthorized(method, raw, headers_get, "bad_space_id")
+            return _unauthorized()
+    elif method in ("POST", "PATCH"):
+        modelid = payload.get("modelid")
+        if not modelid:
+            _log_unauthorized(method, None, headers_get, "missing_modelid")
+            return _unauthorized()
+        space_id = getModelSpaceId(modelid)
+        if not space_id:
+            _log_unauthorized(method, None, headers_get, "unknown_modelid")
             return _unauthorized()
     else:
         _log_unauthorized(method, None, headers_get, "bad_method")
