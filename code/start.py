@@ -8,6 +8,7 @@
 import json
 import os
 import queue
+import re
 
 from flask import Flask, Response, request, render_template, url_for, redirect, jsonify, stream_with_context
 from flask_cors import CORS
@@ -33,9 +34,17 @@ app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("MAX_UPLOAD_BYTES", 25 * 1
 # (override via CORS_ORIGINS, comma-separated) and enable credentials.
 _default_cors = (
     "https://dash.ollebo.com,https://ollebo.com,https://www.ollebo.com,"
-    "http://localhost:5173,http://localhost:3000,http://localhost:8888"
+    "https://maps.ollebo.com"
 )
 _cors_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", _default_cors).split(",") if o.strip()]
+# Local dev hits this API straight from a dev server whose origin keeps moving:
+# vite picks 3000/5173 (and 4173 for `preview`), a taken port bumps it again, and
+# http://localhost:X and http://127.0.0.1:X are *different* origins to the
+# browser. Match any loopback port instead of chasing them one at a time; set
+# CORS_ALLOW_LOOPBACK=0 to drop them (e.g. a deployment that only serves the
+# ollebo.com hosts above).
+if os.environ.get("CORS_ALLOW_LOOPBACK", "1") != "0":
+    _cors_origins.append(re.compile(r"^http://(localhost|127\.0\.0\.1)(:\d+)?$", re.IGNORECASE))
 CORS(app, resources={r"/*": {"origins": _cors_origins}}, supports_credentials=True)
 metrics = PrometheusMetrics(app, path="/metrics")
 
