@@ -9,3 +9,4 @@ prometheus_flask_exporter
 redis
 PyJWT[crypto]
 boto3
+requests

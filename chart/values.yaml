@@ -37,6 +37,13 @@ storage:
   bucket: map-storage
   region: hel1
 
+# Live video (ollebo-video). When enabled, /mission/<key>/hello registers a
+# stream and returns its RTSP publish + HLS/WebRTC playback URLs. Disable to
+# fall back to the static camera_stream_* columns alone.
+video:
+  enabled: true
+  url: http://video-control:8080
+
 # Keycloak config for JWT verification on private-data reads (missions/maps).
 # Same KC_* values as dw's chart; the api derives the realm JWKS URL from these.
 # The `groups` claim carries space UUIDs (== space.id). Blank host => auth off.

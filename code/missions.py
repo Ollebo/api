@@ -2,6 +2,36 @@ from db.postgis import *
 from flask import jsonify
 import json
 import datetime
+import os
+
+import requests
+
+# ollebo-video mints a private per-session RTSP endpoint per stream. Unset =>
+# the video block is omitted and the handshake behaves exactly as before.
+VIDEO_API = os.environ.get("VIDEO_API", "")
+VIDEO_TIMEOUT = float(os.environ.get("VIDEO_TIMEOUT", "3"))
+
+
+def _video_block(mission_key, device_name=None):
+    """Register a video stream for this mission and return its URLs.
+
+    Best-effort by design: video is an add-on to the handshake, and a drone must
+    still get its event ingest URLs when the video service is down or absent.
+    Any failure returns None and the caller omits the block.
+    """
+    if not VIDEO_API:
+        return None
+    try:
+        r = requests.post(
+            "{}/v1/streams".format(VIDEO_API.rstrip("/")),
+            json={"mission_key": str(mission_key), "device_name": device_name},
+            timeout=VIDEO_TIMEOUT,
+        )
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        print("video stream registration failed for mission {}: {}".format(mission_key, e))
+        return None
 
 
 
@@ -40,11 +70,16 @@ def missionHello(key, request):
     mid = str(m["id"])
     base = request.url_root.rstrip("/")
     updated_at = m["stats_updated_at"]
+    # A fresh video stream per handshake, since a handshake is a boot. The old
+    # static `camera` URLs below are kept for clients that have not moved over.
+    device_name = request.args.get("device") or (request.get_json(silent=True) or {}).get("device")
+    video = _video_block(key, device_name)
     return jsonify({
         "ok": True,
         "mission_id": mid,
         "name": m["name"],
         "is_public": m["is_public"],
+        "video": video,
         "camera": {
             "low":    m["camera_stream_low_url"],
             "medium": m["camera_stream_medium_url"],

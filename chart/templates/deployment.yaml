@@ -60,6 +60,13 @@ spec:
             value: {{ .Values.keycloak.protocol | quote }}
           - name: KC_REALM
             value: {{ .Values.keycloak.realm | quote }}
+          {{- if .Values.video.enabled }}
+          # ollebo-video mints a per-boot RTSP endpoint, returned in the `video`
+          # block of /mission/<key>/hello. Best-effort: if the video service is
+          # down the handshake still succeeds, just without that block.
+          - name: VIDEO_API
+            value: {{ .Values.video.url | quote }}
+          {{- end }}
           # Object storage for mission pictures — same S3-compatible backend and
           # AWS_* conventions as dw (Hetzner in prod). Credentials come from the
           # shared `ollebo` Secret (same keys dw reads).

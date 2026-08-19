@@ -166,7 +166,7 @@ OPENAPI_SPEC = {
             "get": {
                 "tags": ["missions"],
                 "summary": "Mission boot-time handshake",
-                "description": "A mission pings this once on startup and gets back its identity, camera-feed and picture-upload URLs (3 quality tiers each), current stats, and the ingest URLs telling it where to send live data next. Stats are maintained by a background scheduler and default to 0.",
+                "description": "A mission pings this once on startup and gets back its identity, a freshly registered live-video stream endpoint, camera-feed and picture-upload URLs (3 quality tiers each), current stats, and the ingest URLs telling it where to send live data next. Pass ?device=<name> to label the video stream. Stats are maintained by a background scheduler and default to 0.",
                 "responses": {
                     "200": {
                         "description": "Mission profile + ingest instructions",
@@ -427,9 +427,43 @@ OPENAPI_SPEC = {
                     "mission_id": {"type": "string", "format": "uuid", "description": "Canonical mission id (use this for ingest even if you pinged with the key)."},
                     "name": {"type": "string"},
                     "is_public": {"type": "boolean"},
+                    "video": {
+                        "type": "object",
+                        "nullable": True,
+                        "description": (
+                            "A live video stream registered with ollebo-video for this boot. "
+                            "`publish` carries the RTSP endpoint and its one-time password; "
+                            "`playback` the HLS/WebRTC URLs viewers use. Null when the video "
+                            "service is not configured or is unreachable — video is additive, "
+                            "so the rest of the handshake is unaffected."
+                        ),
+                        "properties": {
+                            "stream_id": {"type": "string", "format": "uuid"},
+                            "publish": {
+                                "type": "object",
+                                "properties": {
+                                    "rtsps_url": {"type": "string"},
+                                    "rtsp_url": {"type": "string"},
+                                    "username": {"type": "string"},
+                                    "password": {"type": "string"},
+                                },
+                            },
+                            "playback": {
+                                "type": "object",
+                                "properties": {
+                                    "hls": {"type": "string"},
+                                    "webrtc": {"type": "string"},
+                                },
+                            },
+                            "archive": {
+                                "type": "object",
+                                "properties": {"vod": {"type": "string"}},
+                            },
+                        },
+                    },
                     "camera": {
                         "type": "object",
-                        "description": "Camera feed stream URLs per quality tier (null until set).",
+                        "description": "Legacy static camera URLs per quality tier (null until set). Superseded by `video`.",
                         "properties": {
                             "low": {"type": "string", "nullable": True},
                             "medium": {"type": "string", "nullable": True},
