@@ -18,6 +18,15 @@ resources:
     cpu: 500m
     memory: 512Mi
 
+# Postgres connection pool (db/postgis.py). Each request thread borrows a
+# connection for the length of one call; poolMax caps how many a pod can hold,
+# poolTimeout is how long a thread waits for a free one before erroring rather
+# than hanging. hpa.maxReplicas x poolMax has to stay under the cluster's
+# max_connections (100), which dw and map-maker also draw from.
+postgres:
+  poolMax: 8
+  poolTimeout: 5
+
 ingress:
   className: traefik
   host: api.ollebo.com

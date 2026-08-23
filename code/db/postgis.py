@@ -1,19 +1,205 @@
 import psycopg2
 import json
 import os
-from psycopg2.extras import RealDictCursor
+import queue
+import select
 import sys
+import threading
+from functools import wraps
+from psycopg2 import extensions
+from psycopg2.extras import RealDictCursor
 
 
+# gunicorn runs one worker with 16 threads (code/start.sh) and this module used
+# to hand all of them the same module-level connection. psycopg2 serializes
+# concurrent use of a single connection, so every request queued behind every
+# other one: one slow mission_data INSERT stalled /maps/ and /readyz for
+# seconds at a time, which pulled pods out of the Service and timed out the
+# map-maker healthcheck. Threads now borrow a connection from a small pool for
+# the length of one call and give it straight back.
+#
+# Sizing: max_connections on the CNPG cluster is the default 100 and the HPA may
+# take this Deployment to 10 replicas, so the per-pod ceiling has to stay small.
+# Eight is well above the concurrency actually observed (queries are single-digit
+# ms now that Redis absorbs the hot path), and 10 x 8 still leaves headroom for
+# dw, map-maker and the rest.
+_POOL_MAX = int(os.environ.get('POSTGRES_POOL_MAX', 8))
+# How long a thread waits for a free connection before giving up: longer than any
+# healthy query, shorter than the 10s read timeout our callers use.
+_POOL_TIMEOUT = float(os.environ.get('POSTGRES_POOL_TIMEOUT', 5))
+
+_CONNECT_ARGS = dict(
+    database=os.environ.get('POSTGRES_DB', 'ollebo'),
+    user=os.environ.get('POSTGRES_USER', 'ollebo'),
+    host=os.environ.get('POSTGRES_HOST', 'postgis'),
+    password=os.environ.get('POSTGRES_PASSWORD', 'olleb0'),
+    port=int(os.environ.get('POSTGRES_PORT', 5432)),
+    sslmode='disable',
+    # Never let a wedged network hold a request thread open indefinitely.
+    connect_timeout=int(os.environ.get('POSTGRES_CONNECT_TIMEOUT', 5)),
+)
+
+
+def _connect():
+    c = psycopg2.connect(**_CONNECT_ARGS)
+    # Without autocommit psycopg2 opens a transaction for plain SELECTs too and
+    # nothing in this module ever ends it, so read-only sessions sat "idle in
+    # transaction" indefinitely and held back vacuum. Nothing here spans
+    # statements, so committing each one is the same behaviour without that cost.
+    c.autocommit = True
+    return c
+
+
+def _usable(c):
+    """Whether the idle connection `c` can still be handed out.
+
+    All three checks are local — no round trip on the hot path. The socket one
+    matters: when Postgres goes away (a CNPG restart or failover, an admin
+    pg_terminate_backend) psycopg2 does not notice until the next statement, so
+    `closed` and the transaction status both still say the connection is fine.
+    A connection with nothing in flight should have nothing to read; if its
+    socket is readable, what is waiting there is the server hanging up.
+    """
+    if c is None or c.closed:
+        return False
+    try:
+        if c.get_transaction_status() == extensions.TRANSACTION_STATUS_UNKNOWN:
+            return False
+        return not select.select([c.fileno()], [], [], 0)[0]
+    except Exception:
+        return False
+
+
+def _discard(c):
+    try:
+        c.close()
+    except Exception:
+        pass
+
+
+class _Pool:
+    """A small blocking connection pool.
+
+    psycopg2.pool.ThreadedConnectionPool raises as soon as every connection is
+    checked out, which turns a burst into failed requests; this one makes the
+    caller wait instead. Connections open lazily, so an idle pod holds one.
+    """
+
+    def __init__(self, maxconn):
+        self._idle = queue.LifoQueue()
+        self._slots = threading.Semaphore(maxconn)
+        self._maxconn = maxconn
+
+    def acquire(self, timeout):
+        if not self._slots.acquire(timeout=timeout):
+            raise RuntimeError(
+                "postgres pool exhausted: {} connections busy for {}s".format(
+                    self._maxconn, timeout))
+        try:
+            while True:
+                try:
+                    c = self._idle.get_nowait()
+                except queue.Empty:
+                    return _connect()
+                if _usable(c):
+                    return c
+                # Dropped by the server while it sat idle — open a fresh one.
+                _discard(c)
+        except Exception:
+            self._slots.release()
+            raise
+
+    def release(self, c):
+        if _usable(c):
+            self._idle.put(c)
+        else:
+            _discard(c)
+        self._slots.release()
+
+
+_pool = _Pool(_POOL_MAX)
+
+
+class _PooledConnection:
+    """The `conn` this module (and start.py's /readyz) already talks to.
+
+    Keeps the psycopg2 connection API — cursor/commit/rollback — but resolves it
+    to whichever connection the calling thread currently holds, borrowing one on
+    first use. @pooled returns it when the call finishes; start.py releases again
+    on request teardown so a handler that touches `conn` directly cannot leak one.
+    """
+
+    def __init__(self, pool):
+        self._pool = pool
+        self._local = threading.local()
+
+    def _current(self):
+        c = getattr(self._local, 'conn', None)
+        if c is None:
+            c = self._pool.acquire(_POOL_TIMEOUT)
+            self._local.conn = c
+        return c
+
+    def held(self):
+        return getattr(self._local, 'conn', None) is not None
+
+    def release(self):
+        c = getattr(self._local, 'conn', None)
+        if c is None:
+            return
+        self._local.conn = None
+        self._pool.release(c)
+
+    def cursor(self, *args, **kwargs):
+        return self._current().cursor(*args, **kwargs)
+
+    def commit(self):
+        return self._current().commit()
+
+    def rollback(self):
+        return self._current().rollback()
+
+    def __getattr__(self, name):
+        return getattr(self._current(), name)
+
+
+conn = _PooledConnection(_pool)
+
+
+def releaseConnection():
+    """Hand this thread's connection back to the pool; no-op if it holds none."""
+    conn.release()
+
+
+def pooled(fn):
+    """Give `fn` a connection for its duration and return it when it exits.
+
+    A nested call reuses the caller's connection: only the frame that actually
+    borrowed it releases. Cursors never outlive the call — every function here
+    materializes its rows before returning — so the connection is free for
+    another thread immediately.
+    """
+
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        borrowed = not conn.held()
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            if borrowed:
+                conn.release()
+
+    return wrapper
+
+
+# Fail fast at boot the way the old module-level connect() did: a process that
+# cannot reach Postgres should not come up and start answering probes.
 print("Connecting to database")
 try:
-    conn = psycopg2.connect(database = os.environ.get('POSTGRES_DB', 'ollebo'), 
-                        user = os.environ.get('POSTGRES_USER', 'ollebo'), 
-                        host= os.environ.get('POSTGRES_HOST', 'postgis'),
-                        password = os.environ.get('POSTGRES_PASSWORD', 'olleb0'),
-                        port = 5432 ,sslmode='disable')
-except:
-    print("ERROR: Could not connect to Postgres instance.")
+    _boot_conn = _pool.acquire(_POOL_TIMEOUT)
+    _pool.release(_boot_conn)
+except Exception as e:
+    print("ERROR: Could not connect to Postgres instance: {}".format(e))
     sys.exit()
 
 # Execute a command: create datacamp_courses table
@@ -44,6 +230,7 @@ except:
 #conn.commit()
 
 
+@pooled
 def addDataDb(json, db="maps"):
     query = (
         "INSERT INTO maps (creator_id, space_id, asset_id, name, tags, status, "
@@ -85,6 +272,7 @@ _ACTION_TO_STATUS = {
 }
 
 
+@pooled
 def updateMapDataDb(jsonData, db="maps"):
     mapid = jsonData['mapid']
     action = jsonData['action']
@@ -148,6 +336,7 @@ def _visibility_clause(groups):
     return ("(access = %s OR space_id = ANY(%s::uuid[]))", ['public', list(groups)])
 
 
+@pooled
 def getDataDb(db="maps", groups=None):
     print("Getting data from db all")
     vis_sql, vis_params = _visibility_clause(groups)
@@ -172,6 +361,7 @@ def getDataDb(db="maps", groups=None):
 ####
 ## Missions
 ####
+@pooled
 def getMissions(spaceID, status):
     print("Getting close data from db")
     postgreSQL_select_Query = "select * from missions "
@@ -181,6 +371,7 @@ def getMissions(spaceID, status):
     return maps
 
 
+@pooled
 def getMission(id):
     print("Getting close data from db")
     postgreSQL_select_Query = "select * from missions  where id = '"+str(id)+"'"
@@ -190,6 +381,7 @@ def getMission(id):
     return mission
 
 
+@pooled
 def missionExists(mission_id):
     try:
         cur = conn.cursor()
@@ -204,6 +396,7 @@ def missionExists(mission_id):
         return False
 
 
+@pooled
 def missionExistsByKey(key):
     # Mission clients authenticate with the mission key; accept the id too so callers
     # passing an id still validate.
@@ -221,6 +414,7 @@ def missionExistsByKey(key):
         return False
 
 
+@pooled
 def getMissionByKey(key):
     # Resolves a mission from either its key or its id. `is_public` drives read
     # visibility (public missions stream without auth; non-public ones require a
@@ -241,6 +435,7 @@ def getMissionByKey(key):
         return None
 
 
+@pooled
 def getMissionHello(key):
     # Full mission profile for the boot-time "hello" handshake (media URLs + stats).
     # Accepts key or id like getMissionByKey. Kept separate from getMissionByKey so
@@ -264,6 +459,7 @@ def getMissionHello(key):
         return None
 
 
+@pooled
 def getSpaceKey(space_id):
     try:
         cur = conn.cursor()
@@ -281,6 +477,7 @@ def getSpaceKey(space_id):
     return row[0]
 
 
+@pooled
 def getMapSpaceId(mapid):
     try:
         cur = conn.cursor()
@@ -308,6 +505,7 @@ _MODEL_ACTION_TO_STATUS = {
 }
 
 
+@pooled
 def getModelSpaceId(modelid):
     try:
         cur = conn.cursor()
@@ -325,6 +523,7 @@ def getModelSpaceId(modelid):
     return row[0]
 
 
+@pooled
 def updateModelDataDb(jsonData, db="model"):
     modelid = jsonData['modelid']
     action = jsonData['action']
@@ -361,6 +560,7 @@ def updateModelDataDb(jsonData, db="model"):
     return {"data": "saved", "modelid": modelid}
 
 
+@pooled
 def getModelsDb(groups=None):
     vis_sql, vis_params = _visibility_clause(groups)
     query = (
@@ -385,6 +585,7 @@ def getModelsDb(groups=None):
 ####
 ## Events / mission_data
 ####
+@pooled
 def addEvent(jsonData, db="mission_data", mission_id="none"):
     type = jsonData.get('type', 'none')
     db_insert_time = "now()"
@@ -441,6 +642,7 @@ def addEvent(jsonData, db="mission_data", mission_id="none"):
     return {"data": "stored"}
 
 
+@pooled
 def getRecentEvents(mission_id, minutes=15):
     minutes = max(1, min(int(minutes), 60))
     query = (
@@ -472,6 +674,7 @@ def getRecentEvents(mission_id, minutes=15):
     return rows
 
 
+@pooled
 def setPictureUploaded(mission_id, picture_id, url):
     """Phase 2 of the two-phase picture flow: the bytes finally arrived.
 
@@ -520,6 +723,7 @@ def setPictureUploaded(mission_id, picture_id, url):
 ####
 ## Search (replaces Meilisearch)
 ####
+@pooled
 def searchMaps(payload, groups=None):
     print("Searching maps in postgis")
     name = payload.get("name")
