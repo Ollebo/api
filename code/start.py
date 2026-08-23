@@ -21,7 +21,7 @@ from missions import missions, mission, missionValidate, missionHello
 from pictures import upload_picture, download_picture
 from openapi import OPENAPI_SPEC
 from sse_bridge import start_bridge, subscribe
-from db.postgis import getRecentEvents, conn as pg_conn, releaseConnection
+from db.postgis import getRecentEvents, healthcheck as pg_healthcheck, releaseConnection
 from auth import verify_map_request, verify_model_request
 from jwt_auth import get_auth_context, JwtError
 
@@ -29,9 +29,11 @@ app = Flask(__name__)
 
 
 # db.postgis functions borrow a pooled connection and hand it straight back, but
-# a handler that reaches for `conn` itself — /readyz does — borrows outside that.
-# Release at the end of the request so such a handler cannot pin a connection for
-# the life of the thread (or, on the SSE routes, the life of the stream).
+# a handler that reaches for `conn` itself borrows outside that. Release at the
+# end of the request so such a handler cannot pin a connection for the life of
+# the thread (or, on the SSE routes, the life of the stream). No handler does
+# today — /readyz was the one and now uses its own connection — so this is a
+# backstop for the next one rather than something the current routes rely on.
 @app.teardown_appcontext
 def _release_pg_connection(exc):
 	releaseConnection()
@@ -300,16 +302,13 @@ def healthz():
 @app.route("/readyz", methods=["GET"])
 @metrics.do_not_track()
 def readyz():
+	# Runs on db.postgis's dedicated probe connection, not the request pool: a
+	# saturated pod is busy, not broken, and must stay in the Service. Only an
+	# unreachable Postgres fails this.
 	try:
-		with pg_conn.cursor() as cur:
-			cur.execute("SELECT 1")
-			cur.fetchone()
+		pg_healthcheck()
 		return "ok", 200
 	except Exception as e:
-		try:
-			pg_conn.rollback()
-		except Exception:
-			pass
 		return "not ready: {}".format(e), 503
 
 

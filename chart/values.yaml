@@ -21,11 +21,21 @@ resources:
 # Postgres connection pool (db/postgis.py). Each request thread borrows a
 # connection for the length of one call; poolMax caps how many a pod can hold,
 # poolTimeout is how long a thread waits for a free one before erroring rather
-# than hanging. hpa.maxReplicas x poolMax has to stay under the cluster's
-# max_connections (100), which dw and map-maker also draw from.
+# than hanging.
+#
+# Budget: a pod costs poolMax + 1 — the +1 is the connection /readyz uses, which
+# is deliberately outside the pool so a saturated pod still passes readiness.
+# hpa.maxReplicas (10) x (4 + 1) = 50 of the CNPG cluster's max_connections
+# (the default 100), leaving the other half to dw, map-maker and the rest.
+# poolMax was 8, which would have claimed 90 of the 100 at full stretch.
+#
+# healthTimeout bounds the probe's connect and its SELECT 1; keep it comfortably
+# under the readinessProbe timeoutSeconds in deployment.yaml (5s) so the probe
+# reports a verdict rather than being cut off by the kubelet.
 postgres:
-  poolMax: 8
+  poolMax: 4
   poolTimeout: 5
+  healthTimeout: 2
 
 ingress:
   className: traefik
