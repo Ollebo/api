@@ -18,12 +18,20 @@ from psycopg2.extras import RealDictCursor
 # map-maker healthcheck. Threads now borrow a connection from a small pool for
 # the length of one call and give it straight back.
 #
-# Sizing: max_connections on the CNPG cluster is the default 100 and the HPA may
-# take this Deployment to 10 replicas, so the per-pod ceiling has to stay small.
-# Eight is well above the concurrency actually observed (queries are single-digit
-# ms now that Redis absorbs the hot path), and 10 x 8 still leaves headroom for
-# dw, map-maker and the rest.
-_POOL_MAX = int(os.environ.get('POSTGRES_POOL_MAX', 8))
+# Sizing: max_connections on the CNPG cluster is the default 100, shared with dw,
+# map-maker and the rest, and the HPA may take this Deployment to 10 replicas.
+# The per-pod cost is _POOL_MAX + 1 (the probe connection below), so 10 replicas
+# draw 50 of those 100 at full stretch — the previous 8 would have drawn 90 and
+# left nothing for anyone else. That ceiling has never actually been reached
+# because the cluster has no metrics-server, so the HPA cannot scale past
+# minReplicas; sizing for the maximum it is *allowed* to reach is the point.
+#
+# Four is still well above the concurrency observed in practice (queries are
+# single-digit ms now that Redis absorbs the hot path, so one connection serves
+# hundreds of calls a second). Exhausting the pool now only makes request threads
+# wait — /readyz no longer queues behind them — which is the failure mode to
+# prefer: a slow pod rather than one evicted from the Service for being busy.
+_POOL_MAX = int(os.environ.get('POSTGRES_POOL_MAX', 4))
 # How long a thread waits for a free connection before giving up: longer than any
 # healthy query, shorter than the 10s read timeout our callers use.
 _POOL_TIMEOUT = float(os.environ.get('POSTGRES_POOL_TIMEOUT', 5))
@@ -169,6 +177,62 @@ conn = _PooledConnection(_pool)
 def releaseConnection():
     """Hand this thread's connection back to the pool; no-op if it holds none."""
     conn.release()
+
+
+# A connection reserved for /readyz, deliberately outside `_pool`.
+#
+# The probe used to borrow from the pool like any request, so once all _POOL_MAX
+# connections were checked out it blocked for _POOL_TIMEOUT — the same 5s as the
+# readinessProbe's timeoutSeconds — and the kubelet pulled a pod that was merely
+# busy out of the Service, deepening the pile-up it was already struggling with.
+# A readiness probe has to answer "can this pod reach Postgres", never "is this
+# pod busy", so it gets a connection request traffic can never hold.
+_HEALTH_TIMEOUT = float(os.environ.get('POSTGRES_HEALTH_TIMEOUT', 2))
+# Bound the probe server-side as well: a backend wedged on a lock must not hold
+# the probe open past the kubelet's own timeout. Both halves of the round trip
+# (connect, then execute) stay under _HEALTH_TIMEOUT.
+_HEALTH_CONNECT_ARGS = dict(
+    _CONNECT_ARGS,
+    connect_timeout=max(1, int(_HEALTH_TIMEOUT)),
+    options='-c statement_timeout={}'.format(int(_HEALTH_TIMEOUT * 1000)),
+)
+_health_lock = threading.Lock()
+_health_conn = None
+
+
+def healthcheck():
+    """SELECT 1 for /readyz. Returns None if reachable, raises if not."""
+    global _health_conn
+    if not _health_lock.acquire(timeout=_HEALTH_TIMEOUT):
+        # Nothing but another probe can hold this lock, so a probe is still in
+        # flight: it is stuck on the server, not queued behind request traffic.
+        raise RuntimeError(
+            'postgres healthcheck still in flight after {}s'.format(
+                _HEALTH_TIMEOUT))
+    try:
+        # Two attempts: the probe connection sits idle between runs, so a CNPG
+        # restart or failover can drop it without psycopg2 noticing until this
+        # statement. Reconnecting once turns that into a slower ok rather than a
+        # spurious 503 that would evict a pod whose database is in fact fine.
+        for attempt in (1, 2):
+            c = _health_conn
+            if not _usable(c):
+                if c is not None:
+                    _discard(c)
+                _health_conn = c = psycopg2.connect(**_HEALTH_CONNECT_ARGS)
+                c.autocommit = True
+            try:
+                with c.cursor() as cur:
+                    cur.execute('SELECT 1')
+                    cur.fetchone()
+                return
+            except Exception:
+                _discard(c)
+                _health_conn = None
+                if attempt == 2:
+                    raise
+    finally:
+        _health_lock.release()
 
 
 def pooled(fn):

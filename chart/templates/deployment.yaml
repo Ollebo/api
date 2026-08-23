@@ -45,13 +45,20 @@ spec:
           - name: POSTGRES_USER
             value: ollebo
           # Threads borrow a connection from db.postgis's pool for the length of
-          # one call. Keep maxReplicas x poolMax comfortably under the cluster's
-          # max_connections (the CNPG default, 100) — dw, map-maker and the rest
-          # draw from the same budget.
+          # one call. A pod costs poolMax + 1 connections (the +1 being the
+          # probe connection POSTGRES_HEALTH_TIMEOUT governs); keep maxReplicas
+          # x (poolMax + 1) comfortably under the cluster's max_connections (the
+          # CNPG default, 100) — dw, map-maker and the rest share that budget.
           - name: POSTGRES_POOL_MAX
             value: {{ .Values.postgres.poolMax | quote }}
           - name: POSTGRES_POOL_TIMEOUT
             value: {{ .Values.postgres.poolTimeout | quote }}
+          # /readyz runs on its own connection, outside the pool, so a pod with
+          # every pooled connection busy still answers the probe. This bounds
+          # both the connect and the SELECT 1; it must stay under the
+          # readinessProbe timeoutSeconds below.
+          - name: POSTGRES_HEALTH_TIMEOUT
+            value: {{ .Values.postgres.healthTimeout | quote }}
           # Python buffers stdout when it is a pipe, so `kubectl logs` showed
           # nothing but the boot banner for minutes at a time — useless while
           # diagnosing a slow pod.
@@ -114,12 +121,13 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 6
-          # /readyz runs SELECT 1 on a pooled connection. It used to share one
-          # connection with every request thread, so its latency tracked overall
-          # contention rather than health — ~2.2s under load against the previous
-          # timeoutSeconds: 2, which pulled healthy pods out of the Service for
-          # being busy rather than broken. The pool removed that coupling; 5s
-          # still leaves headroom while shedding a genuinely stuck pod.
+          # /readyz runs SELECT 1 on a connection reserved for probes. It first
+          # shared one connection with every request thread (~2.2s under load
+          # against the then timeoutSeconds: 2), then a pooled one — which still
+          # blocked for POSTGRES_POOL_TIMEOUT once the pool was saturated, so a
+          # busy-but-healthy pod could still be pulled from the Service. Its own
+          # connection decouples it from request load entirely: this now fails
+          # only when Postgres is genuinely unreachable.
           readinessProbe:
             httpGet:
               path: /readyz
