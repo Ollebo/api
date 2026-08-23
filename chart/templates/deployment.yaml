@@ -88,21 +88,31 @@ spec:
                 name: ollebo
                 key: AWS_SECRET_ACCESS_KEY
                 optional: true
+          # Liveness is deliberately slack: /healthz is a bare "return ok" and
+          # normally answers in ~30ms, so anything slower means the gunicorn
+          # threads are saturated, not that the process is wedged. Restarting a
+          # merely-busy API drops every in-flight request and deepens the pile-up,
+          # so allow ~60s of sustained unresponsiveness before reaching for it.
           livenessProbe:
             httpGet:
               path: /healthz
               port: 8080
             initialDelaySeconds: 10
             periodSeconds: 10
-            timeoutSeconds: 2
-            failureThreshold: 3
+            timeoutSeconds: 5
+            failureThreshold: 6
+          # /readyz runs SELECT 1 on the shared psycopg2 connection, so its latency
+          # tracks how contended that connection is — it measured ~2.2s under load
+          # against the previous timeoutSeconds: 2, which pulled healthy pods out
+          # of the Service for being slow rather than broken. 5s leaves headroom
+          # above normal latency while still shedding a genuinely stuck pod.
           readinessProbe:
             httpGet:
               path: /readyz
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 5
-            timeoutSeconds: 2
+            timeoutSeconds: 5
             failureThreshold: 3
           resources:
             requests:
