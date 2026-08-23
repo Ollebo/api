@@ -44,6 +44,19 @@ spec:
             value: ollebo-rw
           - name: POSTGRES_USER
             value: ollebo
+          # Threads borrow a connection from db.postgis's pool for the length of
+          # one call. Keep maxReplicas x poolMax comfortably under the cluster's
+          # max_connections (the CNPG default, 100) — dw, map-maker and the rest
+          # draw from the same budget.
+          - name: POSTGRES_POOL_MAX
+            value: {{ .Values.postgres.poolMax | quote }}
+          - name: POSTGRES_POOL_TIMEOUT
+            value: {{ .Values.postgres.poolTimeout | quote }}
+          # Python buffers stdout when it is a pipe, so `kubectl logs` showed
+          # nothing but the boot banner for minutes at a time — useless while
+          # diagnosing a slow pod.
+          - name: PYTHONUNBUFFERED
+            value: "1"
           - name: PROJECT
             value: ollebo
           - name: REDIS_HOST
@@ -101,11 +114,12 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 6
-          # /readyz runs SELECT 1 on the shared psycopg2 connection, so its latency
-          # tracks how contended that connection is — it measured ~2.2s under load
-          # against the previous timeoutSeconds: 2, which pulled healthy pods out
-          # of the Service for being slow rather than broken. 5s leaves headroom
-          # above normal latency while still shedding a genuinely stuck pod.
+          # /readyz runs SELECT 1 on a pooled connection. It used to share one
+          # connection with every request thread, so its latency tracked overall
+          # contention rather than health — ~2.2s under load against the previous
+          # timeoutSeconds: 2, which pulled healthy pods out of the Service for
+          # being busy rather than broken. The pool removed that coupling; 5s
+          # still leaves headroom while shedding a genuinely stuck pod.
           readinessProbe:
             httpGet:
               path: /readyz

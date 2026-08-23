@@ -21,11 +21,21 @@ from missions import missions, mission, missionValidate, missionHello
 from pictures import upload_picture, download_picture
 from openapi import OPENAPI_SPEC
 from sse_bridge import start_bridge, subscribe
-from db.postgis import getRecentEvents, conn as pg_conn
+from db.postgis import getRecentEvents, conn as pg_conn, releaseConnection
 from auth import verify_map_request, verify_model_request
 from jwt_auth import get_auth_context, JwtError
 
 app = Flask(__name__)
+
+
+# db.postgis functions borrow a pooled connection and hand it straight back, but
+# a handler that reaches for `conn` itself — /readyz does — borrows outside that.
+# Release at the end of the request so such a handler cannot pin a connection for
+# the life of the thread (or, on the SSE routes, the life of the stream).
+@app.teardown_appcontext
+def _release_pg_connection(exc):
+	releaseConnection()
+
 # Cap picture (and any) upload bodies so a runaway request can't exhaust memory.
 app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("MAX_UPLOAD_BYTES", 25 * 1024 * 1024))
 # The dashboard opens the SSE stream with EventSource {withCredentials: true},
