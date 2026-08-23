@@ -47,9 +47,9 @@ spec:
           - name: PROJECT
             value: ollebo
           - name: REDIS_HOST
-            value: redis
+            value: {{ .Values.redis.host | quote }}
           - name: REDIS_PORT
-            value: "6379"
+            value: {{ .Values.redis.port | quote }}
           # Keycloak config (same KC_* vars as dw). The api derives the JWKS URL
           # from these to verify Bearer tokens; empty KC_HOST => auth disabled.
           - name: KC_HOST
