@@ -1,0 +1,117 @@
+{{- if .Values.redis.enabled }}
+# Cache backing REDIS_HOST for the API. Everything stored here is a TTL-bounded
+# cache that is re-derivable from Postgres/Keycloak — mission validity, mission
+# metadata, per-space API keys (code/db/redisCache.py) and the Keycloak JWKS
+# (code/jwt_auth.py). Losing it costs a cold start, never data, so this runs
+# with persistence off and an LRU eviction policy rather than a PVC.
+#
+# The Service is deliberately named plain `redis` (not {{ .Release.Name }}-redis):
+# maps-proxy and dronework-app already resolve `redis` in this namespace, so the
+# single Service serves all three. Renaming it silently breaks those two.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.redis.host }}
+  labels:
+    app: redis
+spec:
+  type: ClusterIP
+  selector:
+    app: redis
+  ports:
+    - name: redis
+      port: {{ .Values.redis.port }}
+      protocol: TCP
+      targetPort: redis
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.redis.host }}
+  labels:
+    app: redis
+spec:
+  # Exactly one replica, and Recreate rather than RollingUpdate. Both matter:
+  # a second pod behind this single ClusterIP would take an arbitrary half of
+  # the reads and answer them from an empty keyspace, so cache hits would turn
+  # into silent misses. Scaling this out needs a real sharded/HA Redis, not a
+  # bigger replica count.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      # redis:7-alpine ships the redis user as uid 999 / gid 1000 (they differ —
+      # verified against the image, not assumed). fsGroup makes the /data
+      # emptyDir group-writable so a read-only root filesystem still leaves
+      # redis a usable working directory.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: redis
+          image: {{ .Values.redis.image }}
+          imagePullPolicy: IfNotPresent
+          # --save "" and --appendonly no keep this a pure in-memory cache: no
+          # RDB snapshots, no AOF, nothing to fsync and no volume to provision.
+          # maxmemory-policy allkeys-lru means a full keyspace evicts cold keys
+          # instead of returning OOM errors to the API on write.
+          args:
+            - "--save"
+            - ""
+            - "--appendonly"
+            - "no"
+            - "--maxmemory"
+            - {{ .Values.redis.maxmemory | quote }}
+            - "--maxmemory-policy"
+            - "allkeys-lru"
+          ports:
+            - name: redis
+              containerPort: 6379
+              protocol: TCP
+          # The official image sets WORKDIR/VOLUME /data. Persistence is off so
+          # nothing is ever written there, but readOnlyRootFilesystem would leave
+          # redis without a writable working directory, so back it with a tmpfs.
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: {{ .Values.redis.resources.requests.cpu }}
+              memory: {{ .Values.redis.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.redis.resources.limits.cpu }}
+              memory: {{ .Values.redis.resources.limits.memory }}
+      volumes:
+        - name: data
+          emptyDir: {}
+{{- end }}
