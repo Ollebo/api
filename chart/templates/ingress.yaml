@@ -26,3 +26,45 @@ spec:
                 name: {{ .Release.Name }}
                 port:
                   number: 8080
+{{- range .Values.ingress.extraHosts }}
+---
+# A second public name for the SAME api pods. northamlin.com is the US
+# deployment of the dw image, on this Keycloak realm and this database, so the
+# API behind it is this one -- api.northamlin.com exists because the dashboard
+# and the developer guides on that site must not send people to an ollebo.com
+# host, and because a credentialed request from northamlin.com to an
+# api.ollebo.com would arrive without the `access_token` cookie dw scopes to
+# .northamlin.com.
+#
+# Its own Ingress rather than a second rule on the one above, so each name gets
+# its own Certificate: a single cert covering both would make an ACME failure
+# on either name take the other's HTTPS down with it.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $.Release.Name }}-{{ .host | replace "." "-" }}
+  annotations:
+    kubernetes.io/ingress.class: {{ $.Values.ingress.className | quote }}
+    kubernetes.io/tls-acme: "true"
+    cert-manager.io/cluster-issuer: {{ $.Values.ingress.clusterIssuer | quote }}
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    traefik.ingress.kubernetes.io/router.entrypoints: "websecure,web"
+    traefik.ingress.kubernetes.io/router.middlewares: "ollebo-https-redirect@kubernetescrd"
+spec:
+  ingressClassName: {{ $.Values.ingress.className }}
+  tls:
+    - hosts:
+        - {{ .host }}
+      secretName: {{ .tlsSecret }}
+  rules:
+    - host: {{ .host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $.Release.Name }}
+                port:
+                  number: 8080
+{{- end }}

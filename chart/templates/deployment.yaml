@@ -66,6 +66,12 @@ spec:
             value: "1"
           - name: PROJECT
             value: ollebo
+          # Credentialed CORS allowlist. code/start.py falls back to the
+          # ollebo.com hosts alone, which would block the US site's dashboard
+          # from these same pods; keep this list in sync with
+          # maps-proxy/charts/templates/middleware.yaml and dw's CORS_ORIGINS.
+          - name: CORS_ORIGINS
+            value: {{ join "," .Values.cors.origins | quote }}
           - name: REDIS_HOST
             value: {{ .Values.redis.host | quote }}
           - name: REDIS_PORT

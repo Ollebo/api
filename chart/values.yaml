@@ -41,6 +41,29 @@ ingress:
   className: traefik
   host: api.ollebo.com
   clusterIssuer: http
+  # Additional public names for these same pods, each with its own Certificate.
+  # northamlin.com is the US deployment of the dw image against this realm and
+  # this database; it needs an api host under its own apex because dw scopes the
+  # `access_token` cookie to the apex the browser is on, so a credentialed call
+  # from northamlin.com to api.ollebo.com carries no cookie at all.
+  extraHosts:
+    - host: api.northamlin.com
+      tlsSecret: api-northamlin-tls
+
+# Browser origins allowed to call this API with credentials (the dashboard opens
+# its SSE stream with withCredentials, which forbids a wildcard). Set here rather
+# than left to code/start.py's default because that default knows only about
+# ollebo.com, and both sites' dashboards talk to these same pods.
+cors:
+  origins:
+    - https://dash.ollebo.com
+    - https://ollebo.com
+    - https://www.ollebo.com
+    - https://maps.ollebo.com
+    - https://dash.northamlin.com
+    - https://northamlin.com
+    - https://www.northamlin.com
+    - https://maps.northamlin.com
 
 hpa:
   minReplicas: 2
