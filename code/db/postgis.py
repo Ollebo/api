@@ -35,6 +35,15 @@ _POOL_MAX = int(os.environ.get('POSTGRES_POOL_MAX', 4))
 # How long a thread waits for a free connection before giving up: longer than any
 # healthy query, shorter than the 10s read timeout our callers use.
 _POOL_TIMEOUT = float(os.environ.get('POSTGRES_POOL_TIMEOUT', 5))
+# Server-side cap on any single pooled statement. A query that scans the whole
+# mission_data hypertable (5.5 GB) once held all 4 pool slots for 40-110 s each
+# and starved every other endpoint (Ollebo/api#3). With this cap, a regression
+# like that fails one request instead of the whole pod. 0 disables it.
+_STATEMENT_TIMEOUT_MS = int(os.environ.get('POSTGRES_STATEMENT_TIMEOUT_MS', 30000))
+# How far back setPictureUploaded looks for the pending picture row. Bytes
+# arrive within minutes of their event (max ~5 min seen over 7 days); the
+# window keeps the UPDATE on the newest hypertable chunk instead of all of them.
+_PICTURE_MATCH_WINDOW_HOURS = int(os.environ.get('PICTURE_MATCH_WINDOW_HOURS', 24))
 
 _CONNECT_ARGS = dict(
     database=os.environ.get('POSTGRES_DB', 'ollebo'),
@@ -46,6 +55,8 @@ _CONNECT_ARGS = dict(
     # Never let a wedged network hold a request thread open indefinitely.
     connect_timeout=int(os.environ.get('POSTGRES_CONNECT_TIMEOUT', 5)),
 )
+if _STATEMENT_TIMEOUT_MS > 0:
+    _CONNECT_ARGS['options'] = '-c statement_timeout={}'.format(_STATEMENT_TIMEOUT_MS)
 
 
 def _connect():
@@ -717,12 +728,16 @@ def getRecentEvents(mission_id, minutes=15):
         "'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS db_insert_time "
         "FROM mission_data "
         "WHERE mission = %s "
+        # Bound on the hypertable's partition column so only the newest chunk
+        # is read; db_insert_time has no index and alone forced a full scan
+        # (Ollebo/api#3). The extra day covers devices with skewed clocks.
+        "AND \"time\" >= LOCALTIMESTAMP - (%s || ' minutes')::interval - interval '1 day' "
         "AND db_insert_time >= NOW() - (%s || ' minutes')::interval "
         "ORDER BY db_insert_time ASC"
     )
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute(query, (mission_id, str(minutes)))
+        cur.execute(query, (mission_id, str(minutes), str(minutes)))
         rows = cur.fetchall()
     except Exception as e:
         conn.rollback()
@@ -756,11 +771,14 @@ def setPictureUploaded(mission_id, picture_id, url):
         "        || jsonb_build_object('status', 'uploaded', 'uploaded_at', "
         "           to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')) "
         "WHERE mission = %s AND type = 'picture' "
-        "AND jsonData->>'picture_id' = %s"
+        "AND jsonData->>'picture_id' = %s "
+        # Only recent chunks: without this the UPDATE scanned all 12.5M rows of
+        # the mission (40-110 s) and held a pool slot the whole time (Ollebo/api#3).
+        "AND \"time\" >= LOCALTIMESTAMP - make_interval(hours => %s)"
     )
     cur = conn.cursor()
     try:
-        cur.execute(update, (url, mission_id, picture_id))
+        cur.execute(update, (url, mission_id, picture_id, _PICTURE_MATCH_WINDOW_HOURS))
         if cur.rowcount == 0:
             insert = (
                 "INSERT INTO mission_data "
