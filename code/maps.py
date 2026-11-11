@@ -25,7 +25,10 @@ def setJsonValidate(jsonData):
     return JsonStandrad
 
 
-_KNOWN_ACTIONS = ("makingMap", "ready", "error")
+_KNOWN_ACTIONS = ("makingMap", "ready", "partial", "error",
+                  # publish-only callbacks (spridningstillstand.md)
+                  "publicReady", "publicRefused", "unpublished", "unpublishFailed")
+_PUBLISH_ONLY = ("publicReady", "publicRefused", "unpublished", "unpublishFailed")
 
 
 def _validate_post(payload):
@@ -37,7 +40,7 @@ def _validate_post(payload):
     action = payload["action"]
     if action not in _KNOWN_ACTIONS:
         return ["action(unknown:{})".format(action)]
-    if action == "makingMap":
+    if action == "makingMap" or action in _PUBLISH_ONLY:
         return []
     further = []
     if action == "ready" and not payload.get("tilesURL"):
