@@ -10,6 +10,7 @@ from flask import jsonify, Response
 
 import storage
 from event import resolve_mission, subject_for
+from jwt_auth import get_auth_context, JwtError
 from db.postgis import setPictureUploaded
 from db.natsQue import addToNats
 
@@ -59,6 +60,20 @@ def download_picture(mission_key, picture_id, request):
     mission = resolve_mission(mission_key)
     if mission is None:
         return jsonify({"error": "mission not found"}), 404
+
+    # Raw drone photos are never spread outside the owning space, even for a
+    # public mission (spridningstillstand.md section 3: single raw images have
+    # no exemption). Knowing the mission key is not enough any more.
+    try:
+        groups = get_auth_context(request.headers.get)
+    except JwtError as e:
+        return jsonify({"error": "unauthorized", "detail": str(e)}), 401
+    member = {str(g).lower() for g in (groups or ())}
+    space_id = (mission.get("space_id") or "").lower()
+    if not groups:
+        return jsonify({"error": "unauthorized"}), 401
+    if not space_id or space_id not in member:
+        return jsonify({"error": "forbidden"}), 403
 
     try:
         result = storage.get_picture(mission["id"], picture_id)

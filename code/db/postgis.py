@@ -339,18 +339,154 @@ def addDataDb(json, db="maps"):
 
 
 # Worker reports progress via `action`; the maps_status_check constraint only
-# permits these four status values, so map every callback to one of them.
+# permits four status values, so map every RENDER callback to one of them.
 _ACTION_TO_STATUS = {
     "makingMap": "processing",
     "ready": "ready",
+    "partial": "ready",
     "error": "failed",
 }
+
+# Publish-only callbacks (spridningstillstand.md): they never touch the private
+# render (status/tilesurl/mapdata), only the publish state.
+PUBLISH_ACTIONS = ("publicReady", "publicRefused", "unpublished", "unpublishFailed")
+
+_PUBLISH_STATUSES = ("private", "rendering", "pending_review", "public", "rejected")
+
+
+def _audit(cur, action, mapid, space_id, actor="map-maker", bbox=None, resolution=None,
+           max_zoom=None, material=None, legal_basis=None, detail=None):
+    # publication_audit is append-only (policy 5.7); schema lives in dw (028).
+    cur.execute(
+        "INSERT INTO publication_audit (action, dataset_id, space_id, actor, bbox, "
+        "resolution_m, max_zoom, material_type, legal_basis, detail) "
+        "VALUES (%s, %s::uuid, %s::uuid, %s, %s, %s, %s, %s, %s, %s)",
+        [action, mapid, space_id, actor,
+         json.dumps(bbox) if bbox is not None else None,
+         resolution, max_zoom, material, legal_basis,
+         json.dumps(detail) if detail is not None else None],
+    )
+
+
+def _open_review(cur, mapid, space_id, reason, detail):
+    # One open case per map + reason (policy section 10).
+    cur.execute(
+        "INSERT INTO compliance_review (id, space_id, object_type, object_id, reason, detail) "
+        "SELECT gen_random_uuid(), %s::uuid, 'map', %s::uuid, %s, %s "
+        "WHERE NOT EXISTS (SELECT 1 FROM compliance_review WHERE object_id = %s::uuid "
+        "AND reason = %s AND status = 'open')",
+        [space_id, mapid, reason[:80], json.dumps(detail), mapid, reason[:80]],
+    )
+
+
+def _apply_publish_outcome(cur, jsonData, render_failed=False):
+    """Store the worker's public-render outcome (spridningstillstand.md).
+
+    Only applied while the row is still 'rendering': if a member unpublished or
+    a reviewer rejected meanwhile, the late result is ignored (map-maker removes
+    that public set when it processes the unpublish queued after it).
+    Returns the new publish_status, or None when nothing changed."""
+    mapid = jsonData["mapid"]
+    status = jsonData.get("publishStatus")
+    if render_failed:
+        status, jsonData = "private", {**jsonData, "publishReason": "render_failed"}
+    if status not in _PUBLISH_STATUSES or status == "rendering":
+        return None
+    public_url = jsonData.get("publicTilesURL")
+    if status == "public" and not public_url:
+        status = "pending_review"
+        jsonData = {**jsonData, "publishReason": "public_url_missing"}
+    is_public = status == "public"
+    reason = jsonData.get("publishReason") or None
+    cur.execute(
+        "UPDATE maps SET publish_status = %s, publish_reason = %s, "
+        "public_tilesurl = %s, public_maxzoom = %s, public_resolution_m = %s, "
+        "material_type = COALESCE(%s, material_type), updated_at = now() "
+        "WHERE mapid = %s::uuid AND publish_status = 'rendering' "
+        "RETURNING space_id::text, material_type",
+        [status, (reason or "")[:300] or None,
+         public_url if is_public else None,
+         jsonData.get("publicMaxZoom") if is_public else None,
+         jsonData.get("publicResolutionM") if is_public else None,
+         jsonData.get("materialType"), mapid],
+    )
+    row = cur.fetchone()
+    if row is None:
+        print("publish outcome ignored for {} (no longer rendering)".format(mapid))
+        return None
+    space_id, material = row[0], row[1]
+    detail = {
+        "complianceDetail": jsonData.get("complianceDetail"),
+        "inputType": jsonData.get("inputType"),
+        "reason": reason,
+    }
+    if is_public:
+        _audit(cur, "publish", mapid, space_id,
+               bbox=jsonData.get("publicBbox"),
+               resolution=jsonData.get("publicResolutionM"),
+               max_zoom=jsonData.get("publicMaxZoom"),
+               material=material,
+               legal_basis=jsonData.get("legalBasis"),
+               detail={**detail, "crs": jsonData.get("publicCrs"),
+                       "maxZoomRetina": jsonData.get("publicMaxZoomRetina"),
+                       "tilesUrl": public_url})
+    elif status == "pending_review":
+        _open_review(cur, mapid, space_id, (reason or "unknown").split(":")[0], detail)
+    elif status == "rejected":
+        _audit(cur, "publish_refused", mapid, space_id, material=material, detail=detail)
+    return status
+
+
+def _update_publish_only(cur, jsonData):
+    mapid, action = jsonData["mapid"], jsonData["action"]
+    if action == "unpublished":
+        cur.execute(
+            "UPDATE maps SET action = %s, public_tilesurl = NULL, public_maxzoom = NULL, "
+            "public_resolution_m = NULL, updated_at = now(), "
+            "publish_status = CASE WHEN publish_status IN ('public', 'rendering') "
+            "THEN 'private' ELSE publish_status END "
+            "WHERE mapid = %s::uuid",
+            [action, mapid],
+        )
+    elif action == "unpublishFailed":
+        # The public set may still exist: hide it and put it in front of a human.
+        cur.execute(
+            "UPDATE maps SET action = %s, public_tilesurl = NULL, "
+            "publish_status = 'pending_review', publish_reason = %s, updated_at = now() "
+            "WHERE mapid = %s::uuid RETURNING space_id::text",
+            [action, (jsonData.get("publishReason") or "unpublish_failed")[:300], mapid],
+        )
+        row = cur.fetchone()
+        if row:
+            _open_review(cur, mapid, row[0], "unpublish_failed",
+                         {"detail": jsonData.get("publishReason")})
+    else:  # publicReady / publicRefused
+        cur.execute("UPDATE maps SET action = %s, updated_at = now() WHERE mapid = %s::uuid",
+                    [action, mapid])
+        _apply_publish_outcome(cur, jsonData)
+    return cur.rowcount
 
 
 @pooled
 def updateMapDataDb(jsonData, db="maps"):
     mapid = jsonData['mapid']
     action = jsonData['action']
+
+    if action in PUBLISH_ACTIONS:
+        cur = conn.cursor()
+        try:
+            _update_publish_only(cur, jsonData)
+            cur.execute("SELECT 1 FROM maps WHERE mapid = %s::uuid", [mapid])
+            found = cur.fetchone() is not None
+        except Exception as e:
+            conn.rollback()
+            print("ERROR updateMapDataDb publish failed: mapid={} action={} err={}".format(mapid, action, e))
+            raise
+        conn.commit()
+        if not found:
+            return {"error": "unknown mapid", "mapid": mapid}
+        return {"data": "saved", "mapid": mapid}
+
     status = _ACTION_TO_STATUS.get(action)
     if status is None:
         print("ERROR updateMapDataDb unknown action: mapid={} action={}".format(mapid, action))
@@ -366,6 +502,7 @@ def updateMapDataDb(jsonData, db="maps"):
             **mapData,
             'inputType': jsonData.get('inputType'),
             'variants': jsonData.get('variants'),
+            'publicVariants': jsonData.get('publicVariants') or [],
         }))
         loc = mapData.get('location')
         if loc:
@@ -377,7 +514,7 @@ def updateMapDataDb(jsonData, db="maps"):
             params.append(json.dumps(area))
 
     tiles_url = jsonData.get('tilesURL')
-    if tiles_url:
+    if tiles_url and tiles_url != "none":
         sets.append("tilesurl = %s")
         params.append(tiles_url)
 
@@ -387,11 +524,13 @@ def updateMapDataDb(jsonData, db="maps"):
     cur = conn.cursor()
     try:
         cur.execute(query, params)
+        rowcount = cur.rowcount
+        if rowcount and action != "makingMap":
+            _apply_publish_outcome(cur, jsonData, render_failed=(status == "failed"))
     except Exception as e:
         conn.rollback()
         print("ERROR updateMapDataDb failed: mapid={} action={} status={} err={}".format(mapid, action, status, e))
         raise
-    rowcount = cur.rowcount
     conn.commit()
     if rowcount == 0:
         print("ERROR updateMapDataDb no row matched: mapid={} action={}".format(mapid, action))
@@ -399,16 +538,46 @@ def updateMapDataDb(jsonData, db="maps"):
     return {"data": "saved", "mapid": mapid}
 
 
-    
-
-
-
 def _visibility_clause(groups):
-    # `groups` are the caller's authorized space_ids — validated canonical UUIDs
-    # from jwt_auth.get_auth_context, so the `::uuid[]` cast below is safe.
+    # MAPS. `groups` are the caller's authorized space_ids — validated canonical
+    # UUIDs from jwt_auth.get_auth_context, so the `::uuid[]` cast below is safe.
+    # A map is visible outside its space only once its coarse public render
+    # passed (publish_status = 'public'); `access` alone is just a request.
     if not groups:
-        return ("access = %s", ['public'])
-    return ("(access = %s OR space_id = ANY(%s::uuid[]))", ['public', list(groups)])
+        return ("publish_status = %s", ['public'])
+    return ("(publish_status = %s OR space_id = ANY(%s::uuid[]))", ['public', list(groups)])
+
+
+def _model_visibility_clause(groups):
+    # 3D models are never public (spridningstillstand.md section 3).
+    if not groups:
+        return ("FALSE", [])
+    return ("space_id = ANY(%s::uuid[])", [list(groups)])
+
+
+# Columns that describe the PRIVATE, full-resolution map. Stripped from every
+# row the caller is not a member of (spridningstillstand.md 5.6).
+_PRIVATE_MAP_FIELDS = ("mapdata", "originfile", "asset_id", "creator_id", "accessid",
+                       "mapserver_id", "mapserver_map_key", "publish_reason")
+
+
+def public_map_view(rows, groups=None):
+    """Rewrite map rows for the caller: members see everything; for anyone else
+    `tilesurl` becomes the coarse public URL and private fields are dropped."""
+    member = set(str(g).lower() for g in (groups or ()))
+    if not isinstance(rows, list):
+        return rows
+    out = []
+    for row in rows:
+        if str(row.get("space_id", "")).lower() in member:
+            out.append(row)
+            continue
+        if row.get("publish_status") != "public" or not row.get("public_tilesurl"):
+            continue
+        clean = {k: v for k, v in row.items() if k not in _PRIVATE_MAP_FIELDS}
+        clean["tilesurl"] = row["public_tilesurl"]
+        out.append(clean)
+    return out
 
 
 @pooled
@@ -424,7 +593,7 @@ def getDataDb(db="maps", groups=None):
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute(query, vis_params)
-        return cur.fetchall()
+        return public_map_view(cur.fetchall(), groups)
     except Exception as e:
         try:
             conn.rollback()
@@ -637,7 +806,7 @@ def updateModelDataDb(jsonData, db="model"):
 
 @pooled
 def getModelsDb(groups=None):
-    vis_sql, vis_params = _visibility_clause(groups)
+    vis_sql, vis_params = _model_visibility_clause(groups)
     query = (
         "SELECT *, "
         "TO_CHAR(created_at, 'YYYY-MM-DD') AS created_at, "
@@ -841,7 +1010,7 @@ def searchMaps(payload, groups=None):
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute(query, params)
-        return cur.fetchall()
+        return public_map_view(cur.fetchall(), groups)
     except Exception as e:
         conn.rollback()
         print("searchMaps failed: {}".format(e))
