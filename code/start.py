@@ -58,7 +58,22 @@ _cors_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", _default_cors
 if os.environ.get("CORS_ALLOW_LOOPBACK", "1") != "0":
     _cors_origins.append(re.compile(r"^http://(localhost|127\.0\.0\.1)(:\d+)?$", re.IGNORECASE))
 CORS(app, resources={r"/*": {"origins": _cors_origins}}, supports_credentials=True)
-metrics = PrometheusMetrics(app, path="/metrics")
+def _metrics_path_label(req):
+    # Label requests by route template (/maps/<mapid>), never the raw path:
+    # raw paths put every id in a label (~300k series). Unmatched requests
+    # (404s, scanners) share one label.
+    return req.url_rule.rule if req.url_rule else "<unmatched>"
+
+
+metrics = PrometheusMetrics(app, path="/metrics", group_by=_metrics_path_label)
+
+
+@app.before_request
+def _hide_metrics_from_ingress():
+    # Prometheus scrapes the pod IP directly; anything that came through
+    # Traefik carries X-Forwarded-For. Keep /metrics off api.ollebo.com.
+    if request.path == "/metrics" and request.headers.get("X-Forwarded-For"):
+        return jsonify({"error": "not found"}), 404
 
 start_bridge()
 

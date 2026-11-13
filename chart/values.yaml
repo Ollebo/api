@@ -134,3 +134,7 @@ redis:
     limits:
       cpu: 300m
       memory: 256Mi
+
+# Prometheus PodMonitor (/metrics on the http port).
+metrics:
+  enabled: true

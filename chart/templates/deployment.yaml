@@ -11,10 +11,6 @@ spec:
     metadata:
       labels:
         app: ollebo-api
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "8080"
-        prometheus.io/path: "/metrics"
     spec:
       terminationGracePeriodSeconds: 35
       containers:
