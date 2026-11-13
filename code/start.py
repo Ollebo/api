@@ -65,6 +65,10 @@ def _metrics_path_label(req):
     return req.url_rule.rule if req.url_rule else "<unmatched>"
 
 
+# prometheus_flask_exporter names the label after the callable; keep it "path".
+_metrics_path_label.__name__ = "path"
+
+
 metrics = PrometheusMetrics(app, path="/metrics", group_by=_metrics_path_label)
 
 
