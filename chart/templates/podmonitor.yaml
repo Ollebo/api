@@ -22,3 +22,19 @@ spec:
           action: drop
           regex: .*_created
 {{- end }}
+{{- if and .Values.metrics.enabled .Values.redis.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: redis
+  labels:
+    app: redis
+spec:
+  selector:
+    matchLabels:
+      app: redis
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 30s
+{{- end }}

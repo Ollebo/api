@@ -111,6 +111,30 @@ spec:
             limits:
               cpu: {{ .Values.redis.resources.limits.cpu }}
               memory: {{ .Values.redis.resources.limits.memory }}
+        {{- if .Values.metrics.enabled }}
+        # Prometheus exporter for this Redis (keys, memory, evictions, hit rate).
+        - name: exporter
+          image: {{ .Values.redis.exporterImage }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: REDIS_ADDR
+              value: redis://127.0.0.1:6379
+          ports:
+            - name: metrics
+              containerPort: 9121
+              protocol: TCP
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+        {{- end }}
       volumes:
         - name: data
           emptyDir: {}

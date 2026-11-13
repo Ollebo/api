@@ -126,6 +126,7 @@ redis:
   host: redis
   port: 6379
   image: redis:7-alpine
+  exporterImage: oliver006/redis_exporter:v1.97.0
   maxmemory: 128mb
   resources:
     requests:
