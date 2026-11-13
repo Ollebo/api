@@ -27,8 +27,11 @@ def setJsonValidate(jsonData):
 
 _KNOWN_ACTIONS = ("makingMap", "ready", "partial", "error",
                   # publish-only callbacks (spridningstillstand.md)
-                  "publicReady", "publicRefused", "unpublished", "unpublishFailed")
-_PUBLISH_ONLY = ("publicReady", "publicRefused", "unpublished", "unpublishFailed")
+                  "publicReady", "publicRefused", "unpublished", "unpublishFailed",
+                  # Lantmäteriet permit material package (map_permit, dw 029)
+                  "exportReady", "exportFailed")
+_PUBLISH_ONLY = ("publicReady", "publicRefused", "unpublished", "unpublishFailed",
+                 "exportReady", "exportFailed")
 
 
 def _validate_post(payload):
