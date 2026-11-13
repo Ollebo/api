@@ -351,6 +351,10 @@ _ACTION_TO_STATUS = {
 # render (status/tilesurl/mapdata), only the publish state.
 PUBLISH_ACTIONS = ("publicReady", "publicRefused", "unpublished", "unpublishFailed")
 
+# Permit-package callbacks (exportPermitPackage): they only touch map_permit,
+# never the map's render or publish state.
+EXPORT_ACTIONS = ("exportReady", "exportFailed")
+
 _PUBLISH_STATUSES = ("private", "rendering", "pending_review", "public", "rejected")
 
 
@@ -437,6 +441,36 @@ def _apply_publish_outcome(cur, jsonData, render_failed=False):
     return status
 
 
+def _update_export(cur, jsonData):
+    """Record a permit material package (map_permit, schema in dw 029).
+    Returns True if the map exists."""
+    mapid, action = jsonData["mapid"], jsonData["action"]
+    export = jsonData.get("permitExport") or {}
+    ready = action == "exportReady"
+    files = [
+        {"name": str(f.get("name"))[:200], "key": str(f.get("key"))[:500], "bytes": int(f.get("bytes") or 0)}
+        for f in (export.get("files") or []) if f.get("name") and f.get("key")
+    ] if ready else []
+    cur.execute(
+        "INSERT INTO map_permit (mapid, space_id, export_status, export_files, export_error, export_at) "
+        "SELECT mapid, space_id, %s, %s, %s, now() FROM maps WHERE mapid = %s::uuid "
+        "ON CONFLICT (mapid) DO UPDATE SET export_status = EXCLUDED.export_status, "
+        "export_files = EXCLUDED.export_files, export_error = EXCLUDED.export_error, "
+        "export_at = EXCLUDED.export_at, updated_at = now() "
+        "RETURNING space_id::text",
+        ["ready" if ready else "failed", json.dumps(files),
+         None if ready else str(export.get("error") or "export failed")[:300], mapid],
+    )
+    row = cur.fetchone()
+    if row and ready:
+        # The package is full resolution and stays inside the space; logged
+        # as an export event (policy 5.7), not a publication.
+        _audit(cur, "permit_export", mapid, row[0],
+               detail={"files": len(files), "tiles": export.get("tiles"),
+                       "totalBytes": export.get("totalBytes"), "areaKm2": export.get("areaKm2")})
+    return row is not None
+
+
 def _update_publish_only(cur, jsonData):
     mapid, action = jsonData["mapid"], jsonData["action"]
     if action == "unpublished":
@@ -471,6 +505,19 @@ def _update_publish_only(cur, jsonData):
 def updateMapDataDb(jsonData, db="maps"):
     mapid = jsonData['mapid']
     action = jsonData['action']
+
+    if action in EXPORT_ACTIONS:
+        cur = conn.cursor()
+        try:
+            found = _update_export(cur, jsonData)
+        except Exception as e:
+            conn.rollback()
+            print("ERROR updateMapDataDb export failed: mapid={} action={} err={}".format(mapid, action, e))
+            raise
+        conn.commit()
+        if not found:
+            return {"error": "unknown mapid", "mapid": mapid}
+        return {"data": "saved", "mapid": mapid}
 
     if action in PUBLISH_ACTIONS:
         cur = conn.cursor()
