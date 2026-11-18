@@ -393,3 +393,20 @@ python3 test/demo_features.py
 curl -N http://localhost:8888/event/<MISSION_KEY>/stream
 # knobs (env): API_BASE, MISSION_KEY, CAT_URL   (falls back to a generated image offline)
 ```
+
+# Map metrics
+
+`/metrics` (in-cluster only) reports map outcomes the HTTP status codes hide
+(`code/map_metrics.py`):
+
+| Metric | What it counts |
+|---|---|
+| `api_map_callbacks_total{action,result}` | map-maker callbacks: `saved`, `unknown_mapid`, `unknown_action`, `invalid`, `db_error` |
+| `api_map_creates_total{result}` | Maps registered with `PUT /maps/` |
+| `api_map_nats_publish_total{subject,result}` | Map jobs published to NATS; `error` means the map will never be processed |
+| `api_map_list_total{result}`, `api_map_search_total{result}` | Listings and searches; a failed one answers 200 with an error body |
+| `api_cache_requests_total{cache,result}` | Redis lookups for missions and space keys |
+
+A map id is never a label. A failed callback or publish writes one JSON log
+line (`"event": "map_callback_error"` / `"map_publish_error"`) with the mapid.
+Dashboard: "Ollebo maps" in Grafana.
