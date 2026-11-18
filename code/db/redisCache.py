@@ -2,6 +2,8 @@ import json
 import os
 import redis
 
+import map_metrics
+
 _VALID_TTL = 3600
 _INVALID_TTL = 600
 _KEY_PREFIX = "mission_valid:"
@@ -70,9 +72,13 @@ def getCachedMission(key):
         v = client.get(_MISSION_PREFIX + str(key))
     except Exception as e:
         print("Redis GET failed: {}".format(e))
+        map_metrics.CACHE_REQUESTS.labels("mission", "error").inc()
         return None
     if v is None:
+        map_metrics.CACHE_REQUESTS.labels("mission", "miss").inc()
         return None
+    # A cached "no such mission" is still an answer from the cache.
+    map_metrics.CACHE_REQUESTS.labels("mission", "hit").inc()
     if v == "":
         return ""
     try:
@@ -100,10 +106,13 @@ def getCachedSpaceKey(space_id):
     if client is None:
         return None
     try:
-        return client.get(_SPACE_KEY_PREFIX + str(space_id))
+        v = client.get(_SPACE_KEY_PREFIX + str(space_id))
     except Exception as e:
         print("Redis GET failed: {}".format(e))
+        map_metrics.CACHE_REQUESTS.labels("space_key", "error").inc()
         return None
+    map_metrics.CACHE_REQUESTS.labels("space_key", "miss" if v is None else "hit").inc()
+    return v
 
 
 def setCachedSpaceKey(space_id, key):
