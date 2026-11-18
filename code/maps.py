@@ -2,7 +2,10 @@ from db.postgis import *
 from db.natsQue import addToNats
 from flask import jsonify
 import datetime
+import json
 import uuid
+
+import map_metrics
 
 
 def setJsonValidate(jsonData):
@@ -62,7 +65,9 @@ def mapsSearch(payload, groups=None):
     print(payload)
     if payload is None:
         return '{"error":"Missing search"}'
-    return searchMaps(payload, groups=groups)
+    result = searchMaps(payload, groups=groups)
+    map_metrics.MAP_SEARCHES.labels(map_metrics.query_result(result)).inc()
+    return result
 
 
 
@@ -76,6 +81,7 @@ def maps(payload, request, groups=None):
         print("Update database")
         if payload is None:
             print("ERROR {} /maps/ bad payload: missing=['<body>']".format(request.method))
+            map_metrics.callback(None, _KNOWN_ACTIONS, "invalid")
             return jsonify({"error": "missing body", "missing": ["<body>"]}), 400
         payload["recordtime"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
         missing = _validate_post(payload)
@@ -83,15 +89,28 @@ def maps(payload, request, groups=None):
             print("ERROR {} /maps/ bad payload: missing={} mapid={} action={} keys={}".format(
                 request.method, missing, payload.get("mapid"), payload.get("action"), sorted(payload.keys())
             ))
+            map_metrics.callback(payload.get("action"), _KNOWN_ACTIONS, "invalid", payload.get("mapid"))
             return jsonify({"error": "invalid payload", "missing": missing}), 400
         try:
-            return updateMapDataDb(payload, "maps")
+            result = updateMapDataDb(payload, "maps")
         except Exception as e:
             print("ERROR {} /maps/ db error: mapid={} err={}".format(request.method, payload.get("mapid"), e))
+            map_metrics.callback(payload["action"], _KNOWN_ACTIONS, "db_error", payload.get("mapid"))
             return jsonify({"error": "db error", "detail": str(e)}), 500
+        # updateMapDataDb answers {"error": "unknown mapid" | "unknown action"}
+        # with a 200, so the HTTP metrics cannot see these.
+        outcome = "saved"
+        if isinstance(result, dict) and result.get("error"):
+            outcome = str(result["error"]).replace(" ", "_")
+            if outcome not in ("unknown_mapid", "unknown_action"):
+                outcome = "db_error"
+        map_metrics.callback(payload["action"], _KNOWN_ACTIONS, outcome, payload.get("mapid"))
+        return result
     if request.method == "GET":
         print("List maps (groups={})".format(groups))
-        return getDataDb("maps", groups=groups)
+        result = getDataDb("maps", groups=groups)
+        map_metrics.MAP_LISTS.labels(map_metrics.query_result(result)).inc()
+        return result
     if request.method == "PUT":
         print("Add to database")
         if payload is None:
@@ -103,14 +122,22 @@ def maps(payload, request, groups=None):
             uuid.UUID(str(clearJson["space_id"]))
         except (ValueError, AttributeError, TypeError):
             print("ERROR PUT /maps/ bad space_id: value={!r}".format(clearJson.get("space_id")))
+            map_metrics.MAP_CREATES.labels("invalid").inc()
             return jsonify({"error": "invalid space_id"}), 400
         try:
             result = addDataDb(clearJson, "maps")
         except Exception as e:
             print("ERROR PUT /maps/ db error: mapid={} err={}".format(clearJson.get("mapid"), e))
+            map_metrics.MAP_CREATES.labels("db_error").inc()
             return jsonify({"error": "db error", "detail": str(e)}), 500
+        map_metrics.MAP_CREATES.labels("ok").inc()
         try:
             addToNats("maps", clearJson)
+            map_metrics.MAP_NATS_PUBLISH.labels("maps", "ok").inc()
         except Exception as e:
+            # The row exists but no worker will ever pick it up.
             print("NATS publish failed: {}".format(e))
+            map_metrics.MAP_NATS_PUBLISH.labels("maps", "error").inc()
+            print(json.dumps({"event": "map_publish_error", "mapid": str(clearJson.get("mapid") or ""),
+                              "error": str(e)}, sort_keys=True), flush=True)
         return result
